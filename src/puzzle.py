@@ -34,6 +34,49 @@ class Puzzle:
             max_clues = max(max_clues, clue_count)
         self.__max_col_clues = max_clues
 
+    @classmethod
+    def get_sample(cls):
+        """
+        Get a sample puzzle.
+        """
+        row_clues = [
+            [1, 1, 1],
+            [4, 2],
+            [5, 1, 1, 3],
+            [4, 2],
+            [5, 1, 3],
+            [5, 1, 3],
+            [4, 4],
+            [1, 6, 3],
+            [1, 4, 2],
+            [3, 5],
+            [3, 5, 1],
+            [3, 4, 1],
+            [4, 5],
+            [11],
+            [7],
+        ]
+
+        col_clues = [
+            [1, 5],
+            [2, 7],
+            [2, 7],
+            [4, 1, 2],
+            [6, 1],
+            [6, 1, 1],
+            [2, 5, 2],
+            [2, 4, 1],
+            [2, 4, 1],
+            [2, 4, 2],
+            [3, 8],
+            [3, 1, 6],
+            [5, 5],
+            [4, 4],
+            [2, 1, 1],
+        ]
+
+        return cls(15, 15, row_clues, col_clues)
+
     @property
     def nrows(self) -> int:
         """The number of rows in the puzzle."""

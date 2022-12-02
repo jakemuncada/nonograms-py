@@ -40,7 +40,7 @@ def main():
 def __main():
     """Main function."""
 
-    puzzle = Puzzle(80, 80, [], [])
+    puzzle = Puzzle.get_sample()
     renderer = Renderer(SCREEN)
     renderer.initialize_puzzle(puzzle)
     renderer.render()
