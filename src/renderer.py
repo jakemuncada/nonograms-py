@@ -39,6 +39,8 @@ class Renderer:
         self.__pan_delta: Coord = Coord((0, 0))
 
         self.board_rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
+        self.top_clues_rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
+        self.left_clues_rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
 
         self.board_surface: pygame.Surface = None
         """The board surface that contains the symbols."""
@@ -76,21 +78,42 @@ class Renderer:
 
     def __initialize_puzzle_surfaces(self) -> None:
         """
-        Initialize the puzzle surfaces.
+        Initialize all the puzzle surfaces.
+        """
+        self.__initialize_board_surface()
+
+    def __initialize_board_surface(self) -> None:
+        """
+        Initialize the board surface.
         """
         nrows = self.puzzle.nrows
         ncols = self.puzzle.ncols
+        top_clues_nrows = self.puzzle.max_col_clues
+        left_clues_ncols = self.puzzle.max_row_clues
 
         # Calculate the optimum cell size where the puzzle fills the screen.
-        optimum_cell_size = utils.calc_optimum_cell_size(nrows, ncols)
+        optimum_cell_size = utils.calc_optimum_cell_size(nrows, ncols, top_clues_nrows, left_clues_ncols)
         # Then, apply the scaling factor, i.e. magnification.
         self.cell_size = optimum_cell_size * self.__scale_factor
 
-        # Calculate the size and position of the board.
-        self.board_rect = utils.calc_board_rect(self.cell_size, nrows, ncols)
+        board_rect, top_clues_rect, left_clues_rect, parent_rect = utils.calc_rects(
+            self.cell_size, self.cell_size, self.cell_size,
+            nrows, ncols, top_clues_nrows, left_clues_ncols)
 
-        self.board_surface = pygame.Surface((self.board_rect.width, self.board_rect.height))
+        self.board_rect = board_rect
+        self.top_clues_rect = top_clues_rect
+        self.left_clues_rect = left_clues_rect
+        self.parent_rect = parent_rect
+
+        self.board_surface = pygame.Surface((board_rect.width, board_rect.height))
         self.board_surface.fill(WHITE)
+
+        self.top_clues_surface = pygame.Surface((top_clues_rect.width, top_clues_rect.height))
+        self.top_clues_surface.fill(WHITE)
+
+        self.left_clues_surface = pygame.Surface((left_clues_rect.width, left_clues_rect.height))
+        self.left_clues_surface.fill(WHITE)
+
 
         _, _, width, height = self.board_rect
         bdr = constants.BORDER_THICKNESS
@@ -132,6 +155,22 @@ class Renderer:
                 p2 = (x, height + bdr)
                 pygame.draw.line(self.board_surface, BLACK, p1, p2, 1)
 
+    def __initialize_top_clues_surface(self) -> None:
+        """
+        Initialize the top clues panel surface.
+
+        Note that the board surface must already be initialized.
+        """
+        width = self.board_rect.width
+        height = utils.calc_clues_panel_dimension(self.cell_size, self.puzzle.max_col_clues)
+        left = self.board_rect.left
+        top = self.board_rect.top - height
+
+        self.top_clues_rect = pygame.Rect(left, top, width, height)
+
+        self.top_clues_surface = pygame.Surface((width, height))
+        self.top_clues_surface.fill(WHITE)
+
     def set_pan(self, new_pan_x: float, new_pan_y: float) -> None:
         """
         Set the new pan delta. Rerenders the whole screen.
@@ -144,7 +183,7 @@ class Renderer:
         """
         Set the new scaling factor. Rerenders the whole screen.
         """
-        new_scale = max(new_scale, 0.75)
+        new_scale = max(new_scale, 0.5)
         new_scale = min(new_scale, 3.0)
         self.__scale_factor = new_scale
 
@@ -166,4 +205,8 @@ class Renderer:
         board_x = self.board_rect.x + self.__pan_delta.x
         board_y = self.board_rect.y + self.__pan_delta.y
         self.screen.blit(self.board_surface, (board_x, board_y))
+
+        top_clues_y = self.top_clues_rect.y + self.__pan_delta.y
+        self.screen.blit(self.top_clues_surface, (board_x, top_clues_y))
+
         pygame.display.update()
