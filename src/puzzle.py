@@ -75,7 +75,8 @@ class Puzzle:
             [2, 1, 1],
         ]
 
-        return cls(15, 15, row_clues, col_clues)
+        puzzle = cls(15, 15, row_clues, col_clues)
+        return puzzle
 
     @property
     def nrows(self) -> int:

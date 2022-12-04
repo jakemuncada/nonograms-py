@@ -28,67 +28,106 @@ pygame.display.set_caption("Nonograms")
 
 def main():
     """Main function."""
+
     try:
-        __main()
+        puzzle = Puzzle.get_sample()
+        renderer = Renderer(SCREEN)
+        renderer.initialize_puzzle(puzzle)
+        renderer.render()
+
+        # Loop forever
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    logger.info(f'Quitting nonograms...')
+                    console.info(f'Quitting nonograms...')
+                    pygame.quit()
+                    sys.exit()
+
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    handle_mouse_down(event, renderer)
+
+                elif event.type == pygame.MOUSEMOTION:
+                    handle_mouse_move(event, renderer)
+                
+                elif event.type == pygame.MOUSEBUTTONUP:
+                    handle_mouse_up(event, renderer)
+
+                elif event.type == pygame.MOUSEWHEEL:
+                    handle_mouse_wheel(event, renderer)
+
     except KeyboardInterrupt:
         logger.info(f'Quitting nonograms...')
         console.info(f'Quitting nonograms...')
         pygame.quit()
         sys.exit()
 
+def handle_mouse_down(event: pygame.event.Event, renderer: Renderer) -> None:
+    """
+    Handle mouse down event.
+    """
+    is_lmb, is_mmb, is_rmb = pygame.mouse.get_pressed(3)
+    curr_x, curr_y = pygame.mouse.get_pos()
 
-def __main():
-    """Main function."""
+    if is_lmb:
+        row_idx, col_idx = renderer.screen_to_board_coords(curr_x, curr_y)
+        if (row_idx >= 0 and row_idx < renderer.puzzle.nrows and 
+            col_idx >= 0 and col_idx < renderer.puzzle.ncols):
+           renderer.start_draft(row_idx, col_idx, '.')
 
-    puzzle = Puzzle.get_sample()
-    renderer = Renderer(SCREEN)
-    renderer.initialize_puzzle(puzzle)
+    if is_mmb:
+        renderer.start_drag(curr_x, curr_y)
+
     renderer.render()
 
-    is_dragging = False
+def handle_mouse_up(event: pygame.event.Event, renderer: Renderer) -> None:
+    """
+    Handle mouse up event.
+    """
+    is_lmb, is_mmb, is_rmb = pygame.mouse.get_pressed(3)
 
-    # Loop forever
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                logger.info(f'Quitting nonograms...')
-                console.info(f'Quitting nonograms...')
-                pygame.quit()
-                sys.exit()
+    if not is_lmb:
+        if renderer.is_drafting:
+            for row_idx, col_idx in renderer.get_draft_cell_coords():
+                renderer.puzzle.board[row_idx][col_idx] = renderer.draft_symbol
+        renderer.end_draft()
 
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                is_lmb, is_mmb, is_rmb = pygame.mouse.get_pressed(3)
+    if not is_mmb:
+        renderer.end_drag()
 
-                if is_mmb:
-                    # If middle mouse is pressed, start dragging.
-                    is_dragging = True
-                    orig_x, orig_y = pygame.mouse.get_pos()
-                    orig_pan_x, orig_pan_y = renderer.pan_delta
+    renderer.render()
 
-            elif event.type == pygame.MOUSEMOTION:
-                is_lmb, is_mmb, is_rmb = pygame.mouse.get_pressed(3)
+def handle_mouse_move(event: pygame.event.Event, renderer: Renderer) -> None:
+    """
+    Handle mouse move event.
+    """
+    is_lmb, is_mmb, is_rmb = pygame.mouse.get_pressed(3)
+    curr_x, curr_y = pygame.mouse.get_pos()
 
-                if is_mmb and is_dragging:
-                    curr_x, curr_y = pygame.mouse.get_pos()
-                    delta_x = curr_x - orig_x
-                    delta_y = curr_y - orig_y
-                    new_pan_x = orig_pan_x + delta_x
-                    new_pan_y = orig_pan_y + delta_y
-                    renderer.set_pan(new_pan_x, new_pan_y)
-            
-            elif event.type == pygame.MOUSEBUTTONUP:
-                is_lmb, is_mmb, is_rmb = pygame.mouse.get_pressed(3)
+    if is_lmb and renderer.is_drafting:
+        row_idx, col_idx = renderer.screen_to_board_coords(curr_x, curr_y)
+        if (row_idx >= 0 and row_idx < renderer.puzzle.nrows and 
+            col_idx >= 0 and col_idx < renderer.puzzle.ncols):
+           renderer.update_draft(row_idx, col_idx)
+           renderer.render()
 
-                if not is_mmb:
-                    is_dragging = False
+    if is_mmb and renderer.is_dragging:
+        renderer.update_drag(curr_x, curr_y)
+        renderer.render()
 
-            elif event.type == pygame.MOUSEWHEEL:
-                value = 0.05
-                if pygame.key.get_mods() & pygame.KMOD_CTRL:
-                    # Zoom in/out faster if CTRL key is pressed.
-                    value = 0.15
+def handle_mouse_wheel(event: pygame.event.Event, renderer: Renderer) -> None:
+    """
+    Handle mouse wheel event.
+    """
+    value = 0.05
+    if pygame.key.get_mods() & pygame.KMOD_CTRL:
+        # Zoom in/out faster if CTRL key is pressed.
+        value = 0.15
 
-                if event.y > 0:
-                    renderer.inc_scaling_factor(value)
-                elif event.y < 0:
-                    renderer.inc_scaling_factor(-value)
+    if event.y > 0:
+        renderer.inc_scaling_factor(value)
+    elif event.y < 0:
+        renderer.inc_scaling_factor(-value)
+
+    renderer.initialize_surfaces()
+    renderer.render()

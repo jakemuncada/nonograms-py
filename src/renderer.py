@@ -17,6 +17,7 @@ GRAY = (144, 144, 144)
 RED = (255, 0, 0)
 WHITE = (255, 255, 255)
 BROWN = (138, 94, 56)
+PINK = (227, 28, 121)
 LIGHT_BROWN = (217, 183, 165)
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,16 @@ class Renderer:
         self.cell_size: float = 0.0
 
         self.__scale_factor: float = 1.0
+
         self.__pan_delta: Coord = Coord((0, 0))
+        self.__pan_orig_xy: Coord = None
+        self.__pan_orig_delta: Coord = None
+        self.is_dragging = False
+
+        self.draft_start_cell: Coord = None
+        self.draft_end_cell: Coord = None
+        self.draft_symbol = '.'
+        self.is_drafting = False
 
         self.bdr_thick = constants.BORDER_THICKNESS
 
@@ -66,6 +76,9 @@ class Renderer:
         self.parent_rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
 
         self.board_surface: pygame.Surface = None
+        """The base board surface that contains the base grid."""
+
+        self.symbol_surface: pygame.Surface = None
         """The board surface that contains the symbols."""
 
         self.left_clues_surface: pygame.Surface = None
@@ -101,15 +114,9 @@ class Renderer:
         self.puzzle = puzzle
         self.total_rows = puzzle.nrows + puzzle.max_row_clues
         self.total_cols = puzzle.ncols + puzzle.max_col_clues
-        self.__initialize_puzzle_surfaces()
+        self.initialize_surfaces()
 
-    def __initialize_puzzle_surfaces(self) -> None:
-        """
-        Initialize all the puzzle surfaces.
-        """
-        self.__initialize_surfaces()
-
-    def __initialize_surfaces(self) -> None:
+    def initialize_surfaces(self) -> None:
         """
         Initialize the board surface.
         """
@@ -124,6 +131,9 @@ class Renderer:
         optimum_cell_size = utils.calc_optimum_cell_size(nrows, ncols, top_clues_nrows, left_clues_ncols)
         # Then, apply the scaling factor, i.e. magnification.
         self.cell_size = optimum_cell_size * self.__scale_factor
+        # Ensure that cell_size is EVEN.
+        self.cell_size = int(self.cell_size)
+        self.cell_size = float(self.cell_size) if self.cell_size % 2 == 0 else float(self.cell_size - 1)
 
         # Get the sizes and positions of the board, and the clues panels.
         board_rect, top_clues_rect, left_clues_rect, parent_rect = utils.calc_rects(
@@ -139,6 +149,11 @@ class Renderer:
         # Create the board surface.
         self.board_surface = pygame.Surface((board_rect.width, board_rect.height))
         self.board_surface.fill(WHITE)
+
+        # Create the symbols surface.
+        self.symbol_surface = pygame.Surface((board_rect.width, board_rect.height))
+        pygame.Surface.set_colorkey(self.symbol_surface, PINK)
+        self.symbol_surface.fill(PINK)
 
         # Create the top clues panel surface.
         self.top_clues_surface = pygame.Surface((top_clues_rect.width, top_clues_rect.height))
@@ -163,16 +178,106 @@ class Renderer:
         self.__draw_left_clues_numbers()
 
     ################################################################################################
+    # COORDINATE & RECT GETTER METHODS
+    ################################################################################################
+
+    def get_actual_board_rect(self) -> pygame.Rect:
+        """
+        Get the actual board rect relative to the screen,
+        after adjusting for the parent rect and the pan delta.
+        
+        Note that `self.board_rect` is the rect relative to `self.parent_rect`,
+        so its actual position needs to be adjusted.
+        """
+        board_x = self.parent_rect.x + self.board_rect.x + self.__pan_delta.x
+        board_y = self.parent_rect.y + self.board_rect.y + self.__pan_delta.y
+        board_rect = self.board_surface.get_rect().move(board_x, board_y)
+        return board_rect
+
+    def is_coord_in_board(self, coord_x: float, coord_y: float) -> bool:
+        """
+        Returns true if the specified coordinate is inside the board rect.
+        Returns false otherwise.
+        """
+        board_rect = self.get_actual_board_rect()
+        board_rect.inflate_ip(self.bdr_thick * -4, self.bdr_thick * -4)
+        return board_rect.collidepoint(coord_x, coord_y)
+
+    def screen_to_board_coords(self, screen_x: float, screen_y: float) -> tuple[int, int]:
+        """
+        Convert a point in the screen coordinates to its board coordinates,
+        i.e. the board row index and column index.
+        """
+        board_rect = self.get_actual_board_rect()
+        board_rect.inflate_ip(self.bdr_thick * -4, self.bdr_thick * -4)
+
+        row_idx = (screen_y - board_rect.y) // (self.cell_size + self.bdr_thick)
+        col_idx = (screen_x - board_rect.x) // (self.cell_size + self.bdr_thick)
+        return int(row_idx), int(col_idx)
+
+    def get_draft_cell_coords(self) -> list[tuple[int, int]]:
+        """
+        Get the row/col indices of the draft cells.
+        """
+        cells = []
+        if not self.is_drafting:
+            return cells
+        
+        if self.draft_start_cell is None or self.draft_end_cell is None:
+            logger.error('Draft start/end cell is None during draft mode.')
+            return cells
+        
+        # If the draft is vertical.
+        if self.draft_start_cell.x == self.draft_end_cell.x:
+            x = self.draft_start_cell.x
+            min_y = min(self.draft_start_cell.y, self.draft_end_cell.y)
+            max_y = max(self.draft_start_cell.y, self.draft_end_cell.y)
+            for y in range(min_y, max_y + 1):
+                cells.append((x, y))
+        
+        # Else if the draft is horizontal.
+        elif self.draft_start_cell.y == self.draft_end_cell.y:
+            y = self.draft_start_cell.y
+            min_x = min(self.draft_start_cell.x, self.draft_end_cell.x)
+            max_x = max(self.draft_start_cell.x, self.draft_end_cell.x)
+            for x in range(min_x, max_x + 1):
+                cells.append((x, y))
+
+        # Else if the draft is neither vertical nor horizontal.
+        else:
+            logger.error(f'The draft start cell ({tuple(self.draft_start_cell)}) and '
+                         f'the draft end cell ({tuple(self.draft_end_cell)}) are not aligned.')
+
+        return cells     
+
+    ################################################################################################
     # USER INTERACTION METHODS
     ################################################################################################
 
-    def set_pan(self, new_pan_x: float, new_pan_y: float) -> None:
+    def start_drag(self, curr_x: float, curr_y: float) -> None:
         """
-        Set the new pan delta. Rerenders the whole screen.
+        Start dragging.
         """
-        self.__pan_delta = Coord((new_pan_x, new_pan_y))
-        self.__screen.fill(BROWN)
-        self.render()
+        self.__pan_orig_xy = Coord((curr_x, curr_y))
+        self.__pan_orig_delta = self.pan_delta
+        self.is_dragging = True
+
+    def update_drag(self, curr_x: float, curr_y: float) -> None:
+        """
+        Update the pan delta.
+        """
+        orig_x, orig_y = self.__pan_orig_xy
+        delta_x = curr_x - orig_x
+        delta_y = curr_y - orig_y
+        self.__pan_delta = self.__pan_orig_delta.move((delta_x, delta_y))
+
+    def end_drag(self) -> None:
+        """
+        End the drag.
+        """
+        self.__pan_orig_xy = None
+        self.__pan_orig_delta = None
+        self.is_dragging = False
 
     def set_scaling_factor(self, new_scale: float) -> None:
         """
@@ -182,16 +287,46 @@ class Renderer:
         new_scale = min(new_scale, 3.0)
         self.__scale_factor = new_scale
 
-        self.__screen.fill(BROWN)
-        self.__initialize_puzzle_surfaces()
-        self.render()
-
     def inc_scaling_factor(self, value: float) -> None:
         """
         Decrement the current scaling factor by the specified value.
         Negative values will decrement it.
         """
         self.set_scaling_factor(self.scale_factor + value)
+
+    def start_draft(self, row_idx: int, col_idx: int, symbol: str) -> None:
+        """
+        Start the draft.
+        
+        Drafting is editing the puzzle symbols
+        but the changes have not yet been finalized.
+        """
+        self.draft_start_cell = Coord((row_idx, col_idx))
+        self.draft_end_cell = Coord((row_idx, col_idx))
+        self.draft_symbol = symbol
+        self.is_drafting = True
+
+    def update_draft(self, row_idx: int, col_idx: int) -> None:
+        """
+        Continue drafting, updating the current draft cells.
+
+        Drafting is editing the puzzle symbols
+        but the changes have not yet been finalized.
+        """
+        vertical_len = abs(self.draft_start_cell.x - row_idx)
+        horizontal_len = abs(self.draft_start_cell.y - col_idx)
+        if horizontal_len >= vertical_len:
+            self.draft_end_cell = Coord((self.draft_start_cell.x, col_idx))
+        else:
+            self.draft_end_cell = Coord((row_idx, self.draft_start_cell.y))
+
+    def end_draft(self) -> None:
+        """
+        Finalize the draft.
+        """
+        self.draft_start_pt = None
+        self.draft_symbol = ' '
+        self.is_drafting = False
 
     ################################################################################################
     # RENDER METHOD
@@ -201,23 +336,67 @@ class Renderer:
         """
         Render the current puzzle.
         """
+        self.symbol_surface.fill(PINK)
+        self.__render_symbols()
+        self.__render_draft()
+
         render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
 
-        board_x = self.parent_rect.x + self.board_rect.x + self.__pan_delta.x
-        board_y = self.parent_rect.y + self.board_rect.y + self.__pan_delta.y
-        board_rect = self.board_surface.get_rect().move(board_x, board_y)
+        board_rect = self.get_actual_board_rect()
         render_list.append((self.board_surface, board_rect))
+        render_list.append((self.symbol_surface, board_rect))
 
         top_clues_y = self.parent_rect.y + self.top_clues_rect.y + self.__pan_delta.y
-        top_clues_rect = self.top_clues_surface.get_rect().move(board_x, top_clues_y)
+        top_clues_rect = self.top_clues_surface.get_rect().move(board_rect.x, top_clues_y)
         render_list.append((self.top_clues_surface, top_clues_rect))
 
         left_clues_x = self.parent_rect.x + self.left_clues_rect.x + self.__pan_delta.x
-        left_clues_rect = self.left_clues_surface.get_rect().move(left_clues_x, board_y)
+        left_clues_rect = self.left_clues_surface.get_rect().move(left_clues_x, board_rect.y)
         render_list.append((self.left_clues_surface, left_clues_rect))
 
+        self.screen.fill(BROWN)
         self.screen.blits(render_list)
         pygame.display.update()
+
+    def __render_symbols(self) -> None:
+        """
+        Render the symbols onto the symbols surface.
+        """
+        for row_idx, board_row in enumerate(self.puzzle.board):
+            for col_idx, symbol in enumerate(board_row):
+                self.__render_symbol(row_idx, col_idx, symbol, BLACK)
+
+    def __render_draft(self) -> None:
+        """
+        Render the draft symbols onto the symbols surface.
+        Only renders the draft if `is_drafting` is true.
+        """
+        for row_idx, col_idx in self.get_draft_cell_coords():
+            self.__render_symbol(row_idx, col_idx, self.draft_symbol, GRAY)
+
+    def __render_symbol(self, row_idx: int, col_idx: int,
+        symbol: str, color: tuple = BLACK) -> Optional[pygame.Rect]:
+        """
+        Render a symbol on the symbols surface.
+        """
+        if symbol == ' ':
+            return None
+
+        offset_amount = 3
+        offset_x = offset_amount + self.bdr_thick * 2
+        offset_y = offset_amount + self.bdr_thick * 2
+        offset_w = offset_amount * -2
+        offset_h = offset_amount * -2
+
+        cell_rect_offset = (offset_x, offset_y, offset_w, offset_h)
+        symbol_rect = utils.get_cell_rect(row_idx, col_idx, self.cell_size, self.cell_size, 
+                self.bdr_thick, cell_rect_offset)
+
+        if symbol == '.':
+            return pygame.draw.rect(self.symbol_surface, color, symbol_rect)
+        
+        logger.error(f'Cannot render unknown symbol: {symbol}')
+        return None
 
     ################################################################################################
     # DRAW HELPER METHODS
@@ -323,20 +502,20 @@ class Renderer:
         render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
         font = self.__get_font(self.cell_size, self.cell_size)
 
+        cell_rect_offset = (self.bdr_thick * 2, self.bdr_thick * 2, 0, 0)
+
         for col_idx in range(len(self.puzzle.col_clues)):
             clues = self.puzzle.col_clues[col_idx]
             for row_idx in range(len(clues)):
                 r_idx = self.puzzle.max_col_clues - row_idx - 1
                 num = clues[row_idx]
-                cell_rect = utils.get_cell_rect(r_idx, col_idx, self.cell_size, self.cell_size, self.bdr_thick)
-                cell_rect = cell_rect.move(self.bdr_thick * 2, self.bdr_thick * 2)
-                # pygame.draw.rect(self.top_clues_surface, RED, cell_rect, 1)
+                cell_rect = utils.get_cell_rect(r_idx, col_idx, self.cell_size, self.cell_size, 
+                    self.bdr_thick, cell_rect_offset)
                 text_surface = font.render(str(num), True, BLACK)
                 text_rect = text_surface.get_rect()
                 x = cell_rect.centerx - text_rect.centerx
                 y = cell_rect.centery - text_rect.centery + (text_rect.height / 12)
                 draw_rect = pygame.Rect(x, y, text_rect.width, text_rect.height)
-                # pygame.draw.rect(self.top_clues_surface, GRAY, draw_rect)
                 render_list.append((text_surface, draw_rect))
 
         self.top_clues_surface.blits(render_list)
@@ -348,20 +527,20 @@ class Renderer:
         render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
         font = self.__get_font(self.cell_size, self.cell_size)
 
+        cell_rect_offset = (self.bdr_thick * 2, self.bdr_thick * 2, 0, 0)
+
         for row_idx in range(len(self.puzzle.row_clues)):
             clues = self.puzzle.row_clues[row_idx]
             for col_idx in range(len(clues)):
                 c_idx = self.puzzle.max_row_clues - col_idx - 1
                 num = clues[col_idx]
-                cell_rect = utils.get_cell_rect(row_idx, c_idx, self.cell_size, self.cell_size, self.bdr_thick)
-                cell_rect = cell_rect.move(self.bdr_thick * 2, self.bdr_thick * 2)
-                # pygame.draw.rect(self.top_clues_surface, RED, cell_rect, 1)
+                cell_rect = utils.get_cell_rect(row_idx, c_idx, self.cell_size,
+                    self.cell_size, self.bdr_thick, cell_rect_offset)
                 text_surface = font.render(str(num), True, BLACK)
                 text_rect = text_surface.get_rect()
                 x = cell_rect.centerx - text_rect.centerx
                 y = cell_rect.centery - text_rect.centery + (text_rect.height / 12)
                 draw_rect = pygame.Rect(x, y, text_rect.width, text_rect.height)
-                # pygame.draw.rect(self.top_clues_surface, GRAY, draw_rect)
                 render_list.append((text_surface, draw_rect))
 
         self.left_clues_surface.blits(render_list)

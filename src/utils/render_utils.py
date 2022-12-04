@@ -3,30 +3,8 @@ Some useful utility functions for the renderer.
 """
 
 import pygame
+from typing import Optional, Union
 import src.constants as constants
-
-def offset_rect(rect: pygame.Rect, amount: float) -> pygame.Rect:
-    """
-    Offset a rect by the specified amount and return the resulting rect.
-
-    Offsetting will increase/decrease the boundaries of the rect by the specified amount.
-    
-    A positive value will decrease the boundaries of the rect while a negative value
-    will increase the boundaries of the rect.
-
-    Parameters:
-        rect: The rect to be offset.
-        amount: The offset value.
-
-    Returns:
-        A new Rect instance whose boundaries are offset from the original rect.
-    """
-    x = rect.x + amount
-    y = rect.y + amount
-    width = rect.width - (amount * 2)
-    height = rect.height - (amount * 2)
-    return pygame.Rect(x, y, width, height)
-
 
 def calc_rects(
     board_cell_size: float,
@@ -149,7 +127,9 @@ def get_cell_rect(
     col: int,
     cell_width: float,
     cell_height: float,
-    bdr: int) -> pygame.Rect:
+    bdr: int,
+    offset: Optional[Union[pygame.Rect, tuple[float, float, float, float]]] = None
+    ) -> pygame.Rect:
     """
     Get the rect of the specified cell.
 
@@ -162,6 +142,8 @@ def get_cell_rect(
         cell_width: The cell width.
         cell_height: The cell height.
         bdr: The border thickness.
+        offset: Optional offset amount to offset the
+                x, y, width, and height of the resulting rect.
 
     Returns:
         The rect of the specified cell.
@@ -170,4 +152,11 @@ def get_cell_rect(
     y = (row * cell_height) + (row * bdr)
     width = cell_width
     height = cell_height
-    return pygame.Rect(x, y, width, height)
+
+    if offset is not None:
+        offset_x, offset_y, offset_w, offset_h = offset
+    else:
+        offset_x, offset_y, offset_w, offset_h = 0, 0, 0, 0
+
+    return pygame.Rect(x + offset_x, y + offset_y,
+        width + offset_w, height + offset_h)
