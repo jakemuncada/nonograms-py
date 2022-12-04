@@ -2,8 +2,10 @@
 Module for rendering the game to the screen.
 """
 
+import math
 import pygame
 import logging
+import pygame.gfxdraw
 from typing import Optional
 
 from src.coord import Coord
@@ -152,8 +154,8 @@ class Renderer:
 
         # Create the symbols surface.
         self.symbol_surface = pygame.Surface((board_rect.width, board_rect.height))
-        pygame.Surface.set_colorkey(self.symbol_surface, PINK)
-        self.symbol_surface.fill(PINK)
+        pygame.Surface.set_colorkey(self.symbol_surface, WHITE)
+        self.symbol_surface.fill(WHITE)
 
         # Create the top clues panel surface.
         self.top_clues_surface = pygame.Surface((top_clues_rect.width, top_clues_rect.height))
@@ -336,7 +338,7 @@ class Renderer:
         """
         Render the current puzzle.
         """
-        self.symbol_surface.fill(PINK)
+        self.symbol_surface.fill(WHITE)
         self.__render_symbols()
         self.__render_draft()
 
@@ -372,7 +374,11 @@ class Renderer:
         Only renders the draft if `is_drafting` is true.
         """
         for row_idx, col_idx in self.get_draft_cell_coords():
-            self.__render_symbol(row_idx, col_idx, self.draft_symbol, GRAY)
+            if self.draft_symbol == ' ':
+                new_symbol = self.puzzle.board[row_idx][col_idx]
+            else:
+                new_symbol = self.draft_symbol
+            self.__render_symbol(row_idx, col_idx, new_symbol, GRAY)
 
     def __render_symbol(self, row_idx: int, col_idx: int,
         symbol: str, color: tuple = BLACK) -> Optional[pygame.Rect]:
@@ -392,8 +398,24 @@ class Renderer:
         symbol_rect = utils.get_cell_rect(row_idx, col_idx, self.cell_size, self.cell_size, 
                 self.bdr_thick, cell_rect_offset)
 
+        if symbol == ' ':
+            return pygame.draw.rect(self.symbol_surface, WHITE, symbol_rect)
+
         if symbol == '.':
             return pygame.draw.rect(self.symbol_surface, color, symbol_rect)
+
+        if symbol == 'x':
+            pygame.draw.rect(self.symbol_surface, WHITE, symbol_rect)
+            line_w = 2
+            p1, p2 = symbol_rect.topleft, symbol_rect.bottomright
+            p2 = p2[0] - line_w, p2[1]
+            pygame.draw.aaline(self.symbol_surface, color, p1, p2)
+
+            p1, p2 = symbol_rect.bottomleft, symbol_rect.topright
+            p2 = p2[0] - line_w, p2[1]
+            pygame.draw.aaline(self.symbol_surface, color, p1, p2)
+            
+            return symbol_rect
         
         logger.error(f'Cannot render unknown symbol: {symbol}')
         return None
