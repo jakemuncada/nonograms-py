@@ -10,7 +10,6 @@ from typing import Optional
 from src.coord import Coord
 from src.puzzle import Puzzle
 import src.colors as colors
-import src.constants as constants
 import src.utils.render_utils as utils
 
 
