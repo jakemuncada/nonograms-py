@@ -406,11 +406,10 @@ class Renderer:
             p1, p2 = symbol_rect.topleft, symbol_rect.bottomright
             p2 = p2[0] - line_w / 2, p2[1]
 
-            p1b = (p1[0] + 1, p1[1])
-            p1c = (p1[0], p1[1] + 1)
-
-            p2b = (p2[0], p2[1] - 1)
-            p2c = (p2[0] - 1, p2[1])
+            p1b = p1[0] + 1,    p1[1]
+            p1c = p1[0],        p1[1] + 1
+            p2b = p2[0],        p2[1] - 1
+            p2c = p2[0] - 1,    p2[1]
 
             pygame.draw.aaline(self.symbol_surface, color, p1, p2, 0)
             pygame.draw.aaline(self.symbol_surface, color, p1b, p2b, 0)
@@ -421,7 +420,6 @@ class Renderer:
 
             p1b = p1[0] + 1,    p1[1]
             p1c = p1[0],        p1[1] - 1
-
             p2b = p2[0],        p2[1] + 1
             p2c = p2[0] - 1,    p2[1]
 
