@@ -131,6 +131,8 @@ class Renderer:
         # Ensure that cell_size is EVEN.
         self.cell_size = self.cell_size if self.cell_size % 2 == 0 else self.cell_size - 1
 
+        console.info(f'Reinitializing board, cell size is {self.cell_size}.')
+
         # Get the sizes and positions of the board, and the clues panels.
         board_rect, top_clues_rect, left_clues_rect, parent_rect = utils.calc_rects(
             self.cell_size, self.cell_size, self.cell_size,
@@ -375,15 +377,25 @@ class Renderer:
         if symbol == ' ':
             return None
 
-        offset_amount = 3
+        if self.cell_size <= 6:
+            offset_amount = 0
+        elif self.cell_size < 18:
+            offset_amount = 1
+        elif self.cell_size < 28:
+            offset_amount = 2
+        elif self.cell_size < 50:
+            offset_amount = 3
+        else:
+            offset_amount = int(self.cell_size * 0.06)
+
         offset_x = offset_amount + self.bdr_thick * 2
         offset_y = offset_amount + self.bdr_thick * 2
         offset_w = offset_amount * -2
         offset_h = offset_amount * -2
 
         cell_rect_offset = (offset_x, offset_y, offset_w, offset_h)
-        symbol_rect = utils.get_cell_rect(row_idx, col_idx, self.cell_size, self.cell_size, 
-                self.bdr_thick, cell_rect_offset)
+        symbol_rect = utils.get_cell_rect(row_idx, col_idx,
+            self.cell_size, self.cell_size, self.bdr_thick, cell_rect_offset)
 
         if symbol == ' ':
             return pygame.draw.rect(self.symbol_surface, colors.PUZZLE_BG, symbol_rect)
@@ -395,11 +407,11 @@ class Renderer:
             pygame.draw.rect(self.symbol_surface, colors.PUZZLE_BG, symbol_rect)
             line_w = 2
             p1, p2 = symbol_rect.topleft, symbol_rect.bottomright
-            p2 = p2[0] - line_w, p2[1]
+            p2 = p2[0] - line_w / 2, p2[1]
             pygame.draw.aaline(self.symbol_surface, color, p1, p2)
 
             p1, p2 = symbol_rect.bottomleft, symbol_rect.topright
-            p2 = p2[0] - line_w, p2[1]
+            p2 = p2[0] - line_w / 2, p2[1]
             pygame.draw.aaline(self.symbol_surface, color, p1, p2)
             
             return symbol_rect
