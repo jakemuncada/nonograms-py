@@ -66,6 +66,8 @@ class Renderer:
         """The cell border thickness."""
         self.outer_bdr = self.cell_bdr * 2
         """The outer border thickness."""
+        self.sep_bdr = self.cell_bdr * 2
+        """The thickness of the separator border every 5 rows/cols."""
 
         self.board_rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
         self.top_clues_rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
@@ -117,7 +119,7 @@ class Renderer:
 
         # Calculate the optimum cell size where the puzzle fills the screen.
         optimum_cell_size = utils.calc_optimum_cell_size(nrows, ncols,
-            self.cell_bdr, self.outer_bdr, top_clues_nrows, left_clues_ncols)
+            self.cell_bdr, self.outer_bdr, self.sep_bdr, top_clues_nrows, left_clues_ncols)
 
         # Clamp the minimum zoom amount.
         min_zoom_amt = Renderer.MINIMUM_CELL_SIZE - optimum_cell_size
@@ -133,7 +135,7 @@ class Renderer:
         # Get the sizes and positions of the board, and the clues panels.
         board_rect, top_clues_rect, left_clues_rect, parent_rect = utils.calc_rects(
             self.cell_size, self.cell_size, self.cell_size, self.cell_bdr, self.outer_bdr,
-            nrows, ncols, top_clues_nrows, left_clues_ncols)
+            self.sep_bdr, nrows, ncols, top_clues_nrows, left_clues_ncols)
 
         # Save the calculated values to their respective properties.
         self.board_rect = board_rect
@@ -165,11 +167,11 @@ class Renderer:
 
         # Draw the cell borders.
         self.__draw_cell_borders(self.board_surface, nrows, ncols,
-            self.cell_size, self.cell_bdr, None, self.outer_bdr)
+            self.cell_size, self.cell_bdr, self.sep_bdr, True, True, None, self.outer_bdr)
         self.__draw_cell_borders(self.top_clues_surface, top_clues_nrows, ncols,
-            self.cell_size, self.cell_bdr, None, self.outer_bdr)
+            self.cell_size, self.cell_bdr, self.sep_bdr, False, True, None, self.outer_bdr)
         self.__draw_cell_borders(self.left_clues_surface, nrows, left_clues_ncols,
-            self.cell_size, self.cell_bdr, None, self.outer_bdr)
+            self.cell_size, self.cell_bdr, self.sep_bdr, True, False, None, self.outer_bdr)
 
         # Draw the clue numbers.
         self.__draw_top_clues_numbers()
@@ -394,17 +396,20 @@ class Renderer:
         offset_h = offset_amount * -2
 
         cell_rect_offset = (offset_x, offset_y, offset_w, offset_h)
-        symbol_rect = utils.get_cell_rect(row_idx, col_idx,
-            self.cell_size, self.cell_size, self.cell_bdr, cell_rect_offset)
+        symbol_rect = utils.get_cell_rect(row_idx, col_idx, self.cell_size, self.cell_size,
+            self.cell_bdr, self.sep_bdr, cell_rect_offset)
+
+        # Erase the current symbol.
+        pygame.draw.rect(self.symbol_surface, colors.PUZZLE_BG, symbol_rect)
 
         if symbol == ' ':
-            return pygame.draw.rect(self.symbol_surface, colors.PUZZLE_BG, symbol_rect)
+            # Do nothing for BLANK cells.
+            pass
 
-        if symbol == '.':
-            return pygame.draw.rect(self.symbol_surface, color, symbol_rect)
+        elif symbol == '.':
+            pygame.draw.rect(self.symbol_surface, color, symbol_rect)
 
-        if symbol == 'x':
-            pygame.draw.rect(self.symbol_surface, colors.PUZZLE_BG, symbol_rect)
+        elif symbol == 'x':
             line_w = 2
 
             p1, p2 = symbol_rect.topleft, symbol_rect.bottomright
@@ -430,11 +435,13 @@ class Renderer:
             pygame.draw.aaline(self.symbol_surface, color, p1, p2, 0)
             pygame.draw.aaline(self.symbol_surface, color, p1b, p2b, 0)
             pygame.draw.aaline(self.symbol_surface, color, p1c, p2c, 0)
+
+        else:
+            logger.error(f'Cannot render unknown symbol: {symbol}')
+            return None
             
-            return symbol_rect
+        return symbol_rect
         
-        logger.error(f'Cannot render unknown symbol: {symbol}')
-        return None
 
     ################################################################################################
     # DRAW HELPER METHODS
@@ -483,7 +490,10 @@ class Renderer:
         nrows: int,
         ncols: int,
         cell_size: float,
-        thickness: int,
+        cell_bdr: int,
+        sep_bdr: int,
+        sep_h: bool,
+        sep_v: bool,
         rect: Optional[pygame.Rect] = None,
         offset_outer_bdr: Optional[float] = 0,
         color: tuple = colors.BORDER) -> None:
@@ -495,7 +505,7 @@ class Renderer:
             nrows: The number of rows.
             ncols: The number of columns.
             cell_size: The cell size.
-            thickness: The border thickness.
+            cell_bdr: The cell border thickness.
             rect: The rect where the cells are found, not including outer border.
                   If not specified, the whole surface will be treated as the rect.
             offset_outer_bdr: How many pixels to offset from the outer border.
@@ -503,6 +513,11 @@ class Renderer:
         """
         if rect is None:
             rect = pygame.Rect(0, 0, surface.get_width(), surface.get_height())
+
+        if sep_bdr < cell_bdr:
+            logger.warning(f'The separator border ({sep_bdr}) is smaller '
+                           f'than the cell border ({cell_bdr}).')
+            sep_h, sep_v = False, False
 
         if offset_outer_bdr > 0:
             rect = pygame.Rect(
@@ -512,26 +527,40 @@ class Renderer:
                 rect.height - offset_outer_bdr * 2)
 
         # Draw horizontal cell borders.
-        for i in range(thickness):
+        for i in range(cell_bdr):
             for row_idx in range(nrows - 1):
                 y = rect.y
-                y += (cell_size + thickness) * row_idx   # Skip the previous rows.
-                y += i                             # Skip the previously drawn borders.
-                y += cell_size                     # Draw the line below the current row.
+                y += (cell_size + cell_bdr) * row_idx   # Skip the previous rows.
+                y += (row_idx // 5) * (sep_bdr - cell_bdr) # Skip previous sep borders.
+                y += i                          # Skip the previously drawn borders.
+                y += cell_size                  # Draw the line below the current row.
                 p1 = (rect.x, y)
                 p2 = (rect.x + rect.width + 0.5, y)
                 pygame.draw.line(surface, color, p1, p2, 1)
 
+                if sep_h and (row_idx != nrows - 1) and (row_idx + 1) % 5 == 0:
+                    for sep_idx in range(sep_bdr - cell_bdr):
+                        p1 = (rect.x, y + sep_idx + 1)
+                        p2 = (rect.x + rect.width + 0.5, y + sep_idx + 1)
+                        pygame.draw.line(surface, color, p1, p2, 1)
+
         # Draw vertical cell borders.
-        for i in range(thickness):
+        for i in range(cell_bdr):
             for col_idx in range(ncols - 1):
                 x = rect.x
-                x += (cell_size + thickness) * col_idx  # Skip the previous columns.
-                x += i                                  # Skip the previously drawn borders.
-                x += cell_size                     # Draw the line to the right of the current column.
+                x += (cell_size + cell_bdr) * col_idx  # Skip the previous columns.
+                x += (col_idx // 5) * (sep_bdr - cell_bdr) # Skip previous sep borders.
+                x += i                          # Skip the previously drawn borders.
+                x += cell_size                  # Draw the line to the right of the current column.
                 p1 = (x, rect.y)
                 p2 = (x, rect.y + rect.height + 0.5)
                 pygame.draw.line(surface, color, p1, p2, 1)
+                
+                if sep_v and (col_idx != ncols - 1) and (col_idx + 1) % 5 == 0:
+                    for sep_idx in range(sep_bdr - cell_bdr):
+                        p1 = (x + sep_idx + 1, rect.y)
+                        p2 = (x + sep_idx + 1, rect.y + rect.height + 0.5)
+                        pygame.draw.line(surface, color, p1, p2, 1)
 
     def __draw_top_clues_numbers(self) -> None:
         """
@@ -548,7 +577,7 @@ class Renderer:
                 r_idx = self.puzzle.max_col_clues - row_idx - 1
                 num = clues[row_idx]
                 cell_rect = utils.get_cell_rect(r_idx, col_idx, self.cell_size, self.cell_size, 
-                    self.cell_bdr, cell_rect_offset)
+                    self.cell_bdr, self.sep_bdr, cell_rect_offset)
                 text_surface = font.render(str(num), True, colors.CLUES_TEXT)
                 text_rect = text_surface.get_rect()
                 x = cell_rect.centerx - text_rect.centerx
@@ -573,7 +602,7 @@ class Renderer:
                 c_idx = self.puzzle.max_row_clues - col_idx - 1
                 num = clues[col_idx]
                 cell_rect = utils.get_cell_rect(row_idx, c_idx, self.cell_size,
-                    self.cell_size, self.cell_bdr, cell_rect_offset)
+                    self.cell_size, self.cell_bdr, self.sep_bdr, cell_rect_offset)
                 text_surface = font.render(str(num), True, colors.CLUES_TEXT)
                 text_rect = text_surface.get_rect()
                 x = cell_rect.centerx - text_rect.centerx

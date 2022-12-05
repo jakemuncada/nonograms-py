@@ -12,6 +12,7 @@ def calc_rects(
     left_clues_cell_width: float,
     cell_bdr: int,
     outer_bdr: int,
+    sep_bdr: int,
     board_nrows: int,
     board_ncols: int, 
     top_clues_nrows: int,
@@ -29,6 +30,7 @@ def calc_rects(
         left_clues_cell_width: The width of the cells of the left clues panel.
         cell_bdr: The thickness of the border between the cells.
         outer_bdr: The thickness of the border surrounding the board.
+        sep_bdr: The thickness of the separator border for the rows/cols that are divisible by 5.
         board_nrows: The number of rows of the board.
         board_ncols: The number of columns of the board.
         top_clues_nrows: The number of rows of the top clues panel.
@@ -43,7 +45,9 @@ def calc_rects(
     """
     # Add up all the borders from left-to-right and top-to-bottom, including the outer borders.
     board_border_thick_h = ((board_ncols - 1) * cell_bdr) + (outer_bdr * 2)
+    board_border_thick_h += (board_ncols - 1) // 5 * (sep_bdr - cell_bdr)
     board_border_thick_v = ((board_nrows - 1) * cell_bdr) + (outer_bdr * 2)
+    board_border_thick_v += (board_nrows - 1) // 5 * (sep_bdr - cell_bdr)
     top_clues_border_thick_v = ((top_clues_nrows - 1) * cell_bdr) + (outer_bdr * 2)
     left_clues_border_thick_h = ((left_clues_ncols - 1) * cell_bdr) + (outer_bdr * 2)
 
@@ -100,6 +104,7 @@ def calc_optimum_cell_size(
     board_ncols: int,
     cell_bdr: int,
     outer_bdr: int,
+    sep_bdr: int,
     top_clues_nrows: int,
     left_clues_ncols: int) -> int:
     """
@@ -110,6 +115,7 @@ def calc_optimum_cell_size(
         board_ncols: The number of columns of the board.
         cell_bdr: The thickness of the border between the cells.
         outer_bdr: The thickness of the border surrounding the board.
+        sep_bdr: The thickness of the separator border for the rows/cols that are divisible by 5.
         top_clues_nrows: The number of rows of the top clues panel.
         left_clues_ncols: The number of columns of the left clues panel.
 
@@ -123,7 +129,9 @@ def calc_optimum_cell_size(
     # Get the total width of all the borders (horizontally and vertically) of each panel.
     # This includes the outer borders.
     board_border_thick_h = ((board_ncols - 1) * cell_bdr) + (outer_bdr * 2)
+    board_border_thick_h += ((board_ncols - 1) // 5) * (sep_bdr - cell_bdr)
     board_border_thick_v = ((board_nrows - 1) * cell_bdr) + (outer_bdr * 2)
+    board_border_thick_v += ((board_nrows - 1) // 5) * (sep_bdr - cell_bdr)
     top_clues_border_thick_v = ((top_clues_nrows - 1) * cell_bdr) + outer_bdr
     left_clues_border_thick_h = ((left_clues_ncols - 1) * cell_bdr) + outer_bdr
 
@@ -155,6 +163,7 @@ def get_cell_rect(
     cell_width: float,
     cell_height: float,
     bdr: int,
+    sep_bdr: int,
     offset: Optional[Union[pygame.Rect, tuple[float, float, float, float]]] = None
     ) -> pygame.Rect:
     """
@@ -169,14 +178,15 @@ def get_cell_rect(
         cell_width: The cell width.
         cell_height: The cell height.
         bdr: The border thickness.
+        sep_bdr: The thickness of the separator border for the rows/cols that are divisible by 5.
         offset: Optional offset amount to offset the
                 x, y, width, and height of the resulting rect.
 
     Returns:
         The rect of the specified cell.
     """
-    x = (col * cell_width) + (col * bdr)
-    y = (row * cell_height) + (row * bdr)
+    x = (col * cell_width) + (col * bdr) + ((col // 5) * (sep_bdr - bdr))
+    y = (row * cell_height) + (row * bdr) + ((row // 5) * (sep_bdr - bdr))
     width = cell_width
     height = cell_height
 

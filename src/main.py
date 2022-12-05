@@ -34,7 +34,7 @@ def main():
         # Open a sample puzzle.
         with open('./src/data/puzzles.json', 'r') as f:
             data = json.load(f)
-        puzzle = Puzzle.from_json(data[1])
+        puzzle = Puzzle.from_json(data[0])
 
         renderer = Renderer(SCREEN)
         renderer.initialize_puzzle(puzzle)
