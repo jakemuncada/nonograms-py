@@ -63,7 +63,10 @@ class Renderer:
         self.draft_symbol = '.'
         self.is_drafting = False
 
-        self.bdr_thick = constants.BORDER_THICKNESS
+        self.cell_bdr = 1
+        """The cell border thickness."""
+        self.outer_bdr = self.cell_bdr * 2
+        """The outer border thickness."""
 
         self.board_rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
         self.top_clues_rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
@@ -112,17 +115,30 @@ class Renderer:
         ncols = self.puzzle.ncols
         top_clues_nrows = self.puzzle.max_col_clues
         left_clues_ncols = self.puzzle.max_row_clues
-        bdr_thick = constants.BORDER_THICKNESS
-        bdr_thick2 = bdr_thick * 2
+
+        # # Determine the border sizes.
+        # if nrows >= 40 or ncols >= 40:
+        #     self.cell_bdr = 1
+        # else:
+        #     self.cell_bdr = 2
+        # self.outer_bdr = self.cell_bdr * 2
 
         # Calculate the optimum cell size where the puzzle fills the screen.
-        optimum_cell_size = utils.calc_optimum_cell_size(nrows, ncols, top_clues_nrows, left_clues_ncols)
+        optimum_cell_size = utils.calc_optimum_cell_size(nrows, ncols,
+            self.cell_bdr, self.outer_bdr, top_clues_nrows, left_clues_ncols)
 
         # Clamp the minimum zoom amount.
         min_zoom_amt = Renderer.MINIMUM_CELL_SIZE - optimum_cell_size
         self.__cell_size_zoom_amt = max(min_zoom_amt, self.__cell_size_zoom_amt)
         # Then, apply the magnification (zoom in/out).
         self.cell_size = optimum_cell_size + self.__cell_size_zoom_amt
+
+        # # Readjust the borders.
+        # if self.cell_size <= 30:
+        #     self.cell_bdr = 1
+        # else:
+        #     self.cell_bdr = 2
+        # self.outer_bdr = self.cell_bdr * 2
 
         # Ensure that cell_size is EVEN.
         self.cell_size = self.cell_size if self.cell_size % 2 == 0 else self.cell_size - 1
@@ -131,7 +147,7 @@ class Renderer:
 
         # Get the sizes and positions of the board, and the clues panels.
         board_rect, top_clues_rect, left_clues_rect, parent_rect = utils.calc_rects(
-            self.cell_size, self.cell_size, self.cell_size,
+            self.cell_size, self.cell_size, self.cell_size, self.cell_bdr, self.outer_bdr,
             nrows, ncols, top_clues_nrows, left_clues_ncols)
 
         # Save the calculated values to their respective properties.
@@ -158,14 +174,17 @@ class Renderer:
         self.left_clues_surface.fill(colors.CLUES_BG)
 
         # Draw the outer borders.
-        self.__draw_rect_borders(self.board_surface, bdr_thick * 2)
-        self.__draw_rect_borders(self.top_clues_surface, bdr_thick * 2)
-        self.__draw_rect_borders(self.left_clues_surface, bdr_thick * 2)
+        self.__draw_rect_borders(self.board_surface, self.outer_bdr)
+        self.__draw_rect_borders(self.top_clues_surface, self.outer_bdr)
+        self.__draw_rect_borders(self.left_clues_surface, self.outer_bdr)
 
         # Draw the cell borders.
-        self.__draw_cell_borders(self.board_surface, nrows, ncols, self.cell_size, bdr_thick, None, bdr_thick2)
-        self.__draw_cell_borders(self.top_clues_surface, top_clues_nrows, ncols, self.cell_size, bdr_thick, None, bdr_thick2)
-        self.__draw_cell_borders(self.left_clues_surface, nrows, left_clues_ncols, self.cell_size, bdr_thick, None, bdr_thick2)
+        self.__draw_cell_borders(self.board_surface, nrows, ncols,
+            self.cell_size, self.cell_bdr, None, self.outer_bdr)
+        self.__draw_cell_borders(self.top_clues_surface, top_clues_nrows, ncols,
+            self.cell_size, self.cell_bdr, None, self.outer_bdr)
+        self.__draw_cell_borders(self.left_clues_surface, nrows, left_clues_ncols,
+            self.cell_size, self.cell_bdr, None, self.outer_bdr)
 
         # Draw the clue numbers.
         self.__draw_top_clues_numbers()
@@ -194,7 +213,7 @@ class Renderer:
         Returns false otherwise.
         """
         board_rect = self.get_actual_board_rect()
-        board_rect.inflate_ip(self.bdr_thick * -4, self.bdr_thick * -4)
+        board_rect.inflate_ip(self.outer_bdr * -2, self.outer_bdr * -4)
         return board_rect.collidepoint(coord_x, coord_y)
 
     def screen_to_board_coords(self, screen_x: float, screen_y: float) -> tuple[int, int]:
@@ -203,10 +222,10 @@ class Renderer:
         i.e. the board row index and column index.
         """
         board_rect = self.get_actual_board_rect()
-        board_rect.inflate_ip(self.bdr_thick * -4, self.bdr_thick * -4)
+        board_rect.inflate_ip(self.outer_bdr * -2, self.outer_bdr * -2)
 
-        row_idx = (screen_y - board_rect.y) // (self.cell_size + self.bdr_thick)
-        col_idx = (screen_x - board_rect.x) // (self.cell_size + self.bdr_thick)
+        row_idx = (screen_y - board_rect.y) // (self.cell_size + self.cell_bdr)
+        col_idx = (screen_x - board_rect.x) // (self.cell_size + self.cell_bdr)
         return int(row_idx), int(col_idx)
 
     def get_draft_cell_coords(self) -> list[tuple[int, int]]:
@@ -384,14 +403,14 @@ class Renderer:
         else:
             offset_amount = int(self.cell_size * 0.06)
 
-        offset_x = offset_amount + self.bdr_thick * 2
-        offset_y = offset_amount + self.bdr_thick * 2
+        offset_x = offset_amount + self.outer_bdr
+        offset_y = offset_amount + self.outer_bdr
         offset_w = offset_amount * -2
         offset_h = offset_amount * -2
 
         cell_rect_offset = (offset_x, offset_y, offset_w, offset_h)
         symbol_rect = utils.get_cell_rect(row_idx, col_idx,
-            self.cell_size, self.cell_size, self.bdr_thick, cell_rect_offset)
+            self.cell_size, self.cell_size, self.cell_bdr, cell_rect_offset)
 
         if symbol == ' ':
             return pygame.draw.rect(self.symbol_surface, colors.PUZZLE_BG, symbol_rect)
@@ -536,7 +555,7 @@ class Renderer:
         render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
         font = self.__get_font(self.cell_size, self.cell_size)
 
-        cell_rect_offset = (self.bdr_thick * 2, self.bdr_thick * 2, 0, 0)
+        cell_rect_offset = (self.outer_bdr, self.outer_bdr, 0, 0)
 
         for col_idx in range(len(self.puzzle.col_clues)):
             clues = self.puzzle.col_clues[col_idx]
@@ -544,7 +563,7 @@ class Renderer:
                 r_idx = self.puzzle.max_col_clues - row_idx - 1
                 num = clues[row_idx]
                 cell_rect = utils.get_cell_rect(r_idx, col_idx, self.cell_size, self.cell_size, 
-                    self.bdr_thick, cell_rect_offset)
+                    self.cell_bdr, cell_rect_offset)
                 text_surface = font.render(str(num), True, colors.CLUES_TEXT)
                 text_rect = text_surface.get_rect()
                 x = cell_rect.centerx - text_rect.centerx
@@ -561,7 +580,7 @@ class Renderer:
         render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
         font = self.__get_font(self.cell_size, self.cell_size)
 
-        cell_rect_offset = (self.bdr_thick * 2, self.bdr_thick * 2, 0, 0)
+        cell_rect_offset = (self.outer_bdr, self.outer_bdr, 0, 0)
 
         for row_idx in range(len(self.puzzle.row_clues)):
             clues = self.puzzle.row_clues[row_idx]
@@ -569,7 +588,7 @@ class Renderer:
                 c_idx = self.puzzle.max_row_clues - col_idx - 1
                 num = clues[col_idx]
                 cell_rect = utils.get_cell_rect(row_idx, c_idx, self.cell_size,
-                    self.cell_size, self.bdr_thick, cell_rect_offset)
+                    self.cell_size, self.cell_bdr, cell_rect_offset)
                 text_surface = font.render(str(num), True, colors.CLUES_TEXT)
                 text_rect = text_surface.get_rect()
                 x = cell_rect.centerx - text_rect.centerx

@@ -10,6 +10,8 @@ def calc_rects(
     board_cell_size: float,
     top_clues_cell_height: float,
     left_clues_cell_width: float,
+    cell_bdr: int,
+    outer_bdr: int,
     board_nrows: int,
     board_ncols: int, 
     top_clues_nrows: int,
@@ -25,6 +27,8 @@ def calc_rects(
         board_cell_size: The size of the cells of the board.
         top_clues_cell_height: The height of the cells of the top clues panel.
         left_clues_cell_width: The width of the cells of the left clues panel.
+        cell_bdr: The thickness of the border between the cells.
+        outer_bdr: The thickness of the border surrounding the board.
         board_nrows: The number of rows of the board.
         board_ncols: The number of columns of the board.
         top_clues_nrows: The number of rows of the top clues panel.
@@ -37,13 +41,10 @@ def calc_rects(
         - The size and position of the left clues panel.
         - The size and position of the parent rect that contains the above.
     """
-    bdr_thick = constants.BORDER_THICKNESS
-    bdr_thick2 = bdr_thick * 2
-
-    board_border_thick_h = ((board_ncols - 1 + 4) * bdr_thick)
-    board_border_thick_v = ((board_nrows - 1 + 4) * bdr_thick)
-    top_clues_border_thick_v = ((top_clues_nrows - 1 + 4) * bdr_thick)
-    left_clues_border_thick_h = ((left_clues_ncols - 1 + 4) * bdr_thick)
+    board_border_thick_h = ((board_ncols - 1) * cell_bdr) + (outer_bdr * 2)
+    board_border_thick_v = ((board_nrows - 1) * cell_bdr) + (outer_bdr * 2)
+    top_clues_border_thick_v = ((top_clues_nrows - 1) * cell_bdr) + (outer_bdr * 2)
+    left_clues_border_thick_h = ((left_clues_ncols - 1) * cell_bdr) + (outer_bdr * 2)
 
     total_border_thick_h = board_border_thick_h + left_clues_border_thick_h
     total_border_thick_v = board_border_thick_v + top_clues_border_thick_v
@@ -56,8 +57,8 @@ def calc_rects(
     total_cell_size_h = board_cell_size_h + left_clues_cell_size_h
     total_cell_size_v = board_cell_size_v + top_clues_cell_size_v
 
-    parent_w = total_cell_size_h + total_border_thick_h - bdr_thick2
-    parent_h = total_cell_size_v + total_border_thick_v - bdr_thick2
+    parent_w = total_cell_size_h + total_border_thick_h - outer_bdr
+    parent_h = total_cell_size_v + total_border_thick_v - outer_bdr
     parent_x = constants.SCREEN_HALF_WIDTH - (parent_w / 2)
     parent_y = constants.SCREEN_HALF_HEIGHT - (parent_h / 2)
     parent_rect = pygame.Rect(parent_x, parent_y, parent_w, parent_h)
@@ -85,7 +86,9 @@ def calc_rects(
 
 def calc_optimum_cell_size(
     board_nrows: int,
-    board_ncols: int, 
+    board_ncols: int,
+    cell_bdr: int,
+    outer_bdr: int,
     top_clues_nrows: int,
     left_clues_ncols: int) -> int:
     """
@@ -94,6 +97,8 @@ def calc_optimum_cell_size(
     Parameters:
         board_nrows: The number of rows of the board.
         board_ncols: The number of columns of the board.
+        cell_bdr: The thickness of the border between the cells.
+        outer_bdr: The thickness of the border surrounding the board.
         top_clues_nrows: The number of rows of the top clues panel.
         left_clues_ncols: The number of columns of the left clues panel.
 
@@ -103,10 +108,10 @@ def calc_optimum_cell_size(
     total_nrows = board_nrows + top_clues_nrows
     total_cols = board_ncols + left_clues_ncols
 
-    board_border_thick_h = ((board_ncols - 1 + 4) * constants.BORDER_THICKNESS)
-    board_border_thick_v = ((board_nrows - 1 + 4) * constants.BORDER_THICKNESS)
-    top_clues_border_thick_v = ((top_clues_nrows - 1 + 2) * constants.BORDER_THICKNESS)
-    left_clues_border_thick_h = ((left_clues_ncols - 1 + 2) * constants.BORDER_THICKNESS)
+    board_border_thick_h = ((board_ncols - 1) * cell_bdr) + (outer_bdr * 2)
+    board_border_thick_v = ((board_nrows - 1) * cell_bdr) + (outer_bdr * 2)
+    top_clues_border_thick_v = ((top_clues_nrows - 1) * cell_bdr) + outer_bdr
+    left_clues_border_thick_h = ((left_clues_ncols - 1) * cell_bdr) + outer_bdr
 
     total_border_thick_h = board_border_thick_h + left_clues_border_thick_h
     total_border_thick_v = board_border_thick_v + top_clues_border_thick_v
