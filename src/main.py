@@ -131,15 +131,15 @@ def handle_mouse_wheel(event: pygame.event.Event, renderer: Renderer) -> None:
     """
     Handle mouse wheel event.
     """
-    value = 0.05
+    value = 2
     if pygame.key.get_mods() & pygame.KMOD_CTRL:
         # Zoom in/out faster if CTRL key is pressed.
-        value = 0.15
+        value = 6
 
     if event.y > 0:
-        renderer.inc_scaling_factor(value)
+        renderer.zoom(value)
     elif event.y < 0:
-        renderer.inc_scaling_factor(-value)
+        renderer.zoom(-value)
 
     renderer.initialize_surfaces()
     renderer.render()

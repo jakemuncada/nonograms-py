@@ -23,18 +23,16 @@ class Renderer:
     Renders the game to the screen.
     """
 
-    FLAG_BORDER_NONE = 0
-    FLAG_BORDER_TOP = 1 << 0
-    FLAG_BORDER_RIGHT = 1 << 1
-    FLAG_BORDER_BOT = 1 << 2
-    FLAG_BORDER_LEFT = 1 << 3
-    FLAG_BORDER_ALL = FLAG_BORDER_TOP | FLAG_BORDER_LEFT | FLAG_BORDER_RIGHT | FLAG_BORDER_BOT
+    MINIMUM_CELL_SIZE = 4
 
     def __init__(self, screen: pygame.Surface) -> None:
         self.__screen = screen
+        """The main screen surface."""
         self.__screen.fill(colors.MAIN_BG)
 
         self.__fonts: list[pygame.font.Font] = []
+        """The list of fonts."""
+        self.__fonts.append(pygame.font.SysFont('consolas', 6))
         self.__fonts.append(pygame.font.SysFont('consolas', 10))
         self.__fonts.append(pygame.font.SysFont('consolas', 13))
         self.__fonts.append(pygame.font.SysFont('consolas', 16))
@@ -45,12 +43,17 @@ class Renderer:
         self.__fonts.append(pygame.font.SysFont('consolas', 36))
 
         self.puzzle: Puzzle = None
+        """The puzzle object."""
         self.total_rows: int = 0
         self.total_cols: int = 0
 
-        self.cell_size: float = 0.0
-
-        self.__scale_factor: float = 1.0
+        self.cell_size: int = 0
+        """The current size of the cell in pixels, including the zoom amount."""
+        self.__cell_size_zoom_amt: int = 0
+        """
+        The current zoom amount. Positive values increase the cell size
+        while negative values decrease it.
+        """
 
         self.__pan_delta: Coord = Coord((0, 0))
         self.__pan_orig_xy: Coord = None
@@ -90,11 +93,6 @@ class Renderer:
     def pan_delta(self) -> Coord:
         """The pan delta."""
         return self.__pan_delta
-        
-    @property
-    def scale_factor(self) -> Coord:
-        """The pan delta."""
-        return self.__scale_factor
 
     ################################################################################################
     # INITIALIZATION METHODS
@@ -123,11 +121,15 @@ class Renderer:
 
         # Calculate the optimum cell size where the puzzle fills the screen.
         optimum_cell_size = utils.calc_optimum_cell_size(nrows, ncols, top_clues_nrows, left_clues_ncols)
-        # Then, apply the scaling factor, i.e. magnification.
-        self.cell_size = optimum_cell_size * self.__scale_factor
+
+        # Clamp the minimum zoom amount.
+        min_zoom_amt = Renderer.MINIMUM_CELL_SIZE - optimum_cell_size
+        self.__cell_size_zoom_amt = max(min_zoom_amt, self.__cell_size_zoom_amt)
+        # Then, apply the magnification (zoom in/out).
+        self.cell_size = optimum_cell_size + self.__cell_size_zoom_amt
+
         # Ensure that cell_size is EVEN.
-        self.cell_size = int(self.cell_size)
-        self.cell_size = float(self.cell_size) if self.cell_size % 2 == 0 else float(self.cell_size - 1)
+        self.cell_size = self.cell_size if self.cell_size % 2 == 0 else self.cell_size - 1
 
         # Get the sizes and positions of the board, and the clues panels.
         board_rect, top_clues_rect, left_clues_rect, parent_rect = utils.calc_rects(
@@ -273,20 +275,13 @@ class Renderer:
         self.__pan_orig_delta = None
         self.is_dragging = False
 
-    def set_scaling_factor(self, new_scale: float) -> None:
+    def zoom(self, value: int) -> None:
         """
-        Set the new scaling factor. Rerenders the whole screen.
+        Zoom in/out by the specified value.
+        Positive values zoom out. Negative values zoom in.
         """
-        new_scale = max(new_scale, 0.5)
-        new_scale = min(new_scale, 3.0)
-        self.__scale_factor = new_scale
-
-    def inc_scaling_factor(self, value: float) -> None:
-        """
-        Decrement the current scaling factor by the specified value.
-        Negative values will decrement it.
-        """
-        self.set_scaling_factor(self.scale_factor + value)
+        value = value if value % 2 == 0 else value - 1
+        self.__cell_size_zoom_amt += value
 
     def start_draft(self, row_idx: int, col_idx: int, symbol: str) -> None:
         """
@@ -417,7 +412,7 @@ class Renderer:
     ################################################################################################
 
     def __draw_rect_borders(self, surface: pygame.Surface, thickness: int,
-        rect: Optional[pygame.Rect] = None, flags: int = FLAG_BORDER_ALL, color: tuple = colors.BORDER) -> None:
+        rect: Optional[pygame.Rect] = None, color: tuple = colors.BORDER) -> None:
         """
         Draw the borders with size and position of the given rect.
 
@@ -434,25 +429,25 @@ class Renderer:
             rect = pygame.Rect(0, 0, surface.get_width(), surface.get_height())
 
         for i in range(thickness):
-            if flags & Renderer.FLAG_BORDER_TOP:
-                p1 = (0, i)
-                p2 =  (rect.width - 0.5, i)
-                pygame.draw.line(surface, color, p1, p2, 1)
+            # Draw the TOP border.
+            p1 = (0, i)
+            p2 =  (rect.width - 0.5, i)
+            pygame.draw.line(surface, color, p1, p2, 1)
             
-            if flags & Renderer.FLAG_BORDER_RIGHT:
-                p1 = (rect.width - (i + 1), 0)
-                p2 = (rect.width - (i + 1), rect.height - 0.5)
-                pygame.draw.line(surface, color, p1, p2, 1)
+            # Draw the RIGHT border.
+            p1 = (rect.width - (i + 1), 0)
+            p2 = (rect.width - (i + 1), rect.height - 0.5)
+            pygame.draw.line(surface, color, p1, p2, 1)
                 
-            if flags & Renderer.FLAG_BORDER_BOT:
-                p1 = (0, rect.height - (i + 1))
-                p2 = (rect.width - 0.5, rect.height - (i + 1))
-                pygame.draw.line(surface, color, p1, p2, 1)
+            # Draw the BOTTOM border.
+            p1 = (0, rect.height - (i + 1))
+            p2 = (rect.width - 0.5, rect.height - (i + 1))
+            pygame.draw.line(surface, color, p1, p2, 1)
 
-            if flags & Renderer.FLAG_BORDER_LEFT:
-                p1 = (i, 0)
-                p2 = (i, rect.height - 0.5)
-                pygame.draw.line(surface, color, p1, p2, 1)
+            # Draw the LEFT border.
+            p1 = (i, 0)
+            p2 = (i, rect.height - 0.5)
+            pygame.draw.line(surface, color, p1, p2, 1)
 
     def __draw_cell_borders(self,
         surface: pygame.Surface,
@@ -578,4 +573,6 @@ class Renderer:
             return self.__fonts[-6]
         if mini >= 22:
             return self.__fonts[-7]
-        return self.__fonts[-8]
+        if mini >= 12:
+            return self.__fonts[-8]
+        return self.__fonts[-9]

@@ -87,7 +87,7 @@ def calc_optimum_cell_size(
     board_nrows: int,
     board_ncols: int, 
     top_clues_nrows: int,
-    left_clues_ncols: int) -> float:
+    left_clues_ncols: int) -> int:
     """
     Calculate the cell size such that the puzzle fills the screen optimally.
 
@@ -118,6 +118,9 @@ def calc_optimum_cell_size(
 
     cell_width = (usable_width - total_border_thick_h) / total_cols
     cell_height = (usable_height - total_border_thick_v) / total_nrows
+
+    cell_width = max(2, int(cell_width))
+    cell_height = max(2, int(cell_height))
 
     return min(cell_width, cell_height)
 
