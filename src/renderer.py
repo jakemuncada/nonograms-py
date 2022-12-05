@@ -2,7 +2,6 @@
 Module for rendering the game to the screen.
 """
 
-import math
 import pygame
 import logging
 import pygame.gfxdraw
@@ -10,17 +9,10 @@ from typing import Optional
 
 from src.coord import Coord
 from src.puzzle import Puzzle
+import src.colors as colors
 import src.constants as constants
 import src.utils.render_utils as utils
 
-
-BLACK = (0, 0, 0)
-GRAY = (144, 144, 144)
-RED = (255, 0, 0)
-WHITE = (255, 255, 255)
-BROWN = (138, 94, 56)
-PINK = (227, 28, 121)
-LIGHT_BROWN = (217, 183, 165)
 
 logger = logging.getLogger(__name__)
 console = logging.getLogger('console')
@@ -40,7 +32,7 @@ class Renderer:
 
     def __init__(self, screen: pygame.Surface) -> None:
         self.__screen = screen
-        self.__screen.fill(BROWN)
+        self.__screen.fill(colors.MAIN_BG)
 
         self.__fonts: list[pygame.font.Font] = []
         self.__fonts.append(pygame.font.SysFont('consolas', 10))
@@ -150,20 +142,20 @@ class Renderer:
 
         # Create the board surface.
         self.board_surface = pygame.Surface((board_rect.width, board_rect.height))
-        self.board_surface.fill(WHITE)
+        self.board_surface.fill(colors.PUZZLE_BG)
 
         # Create the symbols surface.
         self.symbol_surface = pygame.Surface((board_rect.width, board_rect.height))
-        pygame.Surface.set_colorkey(self.symbol_surface, WHITE)
-        self.symbol_surface.fill(WHITE)
+        pygame.Surface.set_colorkey(self.symbol_surface, colors.PUZZLE_BG)
+        self.symbol_surface.fill(colors.PUZZLE_BG)
 
         # Create the top clues panel surface.
         self.top_clues_surface = pygame.Surface((top_clues_rect.width, top_clues_rect.height))
-        self.top_clues_surface.fill(LIGHT_BROWN)
+        self.top_clues_surface.fill(colors.CLUES_BG)
 
         # Create the left clues panel surface.
         self.left_clues_surface = pygame.Surface((left_clues_rect.width, left_clues_rect.height))
-        self.left_clues_surface.fill(LIGHT_BROWN)
+        self.left_clues_surface.fill(colors.CLUES_BG)
 
         # Draw the outer borders.
         self.__draw_rect_borders(self.board_surface, bdr_thick * 2)
@@ -338,7 +330,7 @@ class Renderer:
         """
         Render the current puzzle.
         """
-        self.symbol_surface.fill(WHITE)
+        self.symbol_surface.fill(colors.PUZZLE_BG)
         self.__render_symbols()
         self.__render_draft()
 
@@ -356,7 +348,7 @@ class Renderer:
         left_clues_rect = self.left_clues_surface.get_rect().move(left_clues_x, board_rect.y)
         render_list.append((self.left_clues_surface, left_clues_rect))
 
-        self.screen.fill(BROWN)
+        self.screen.fill(colors.MAIN_BG)
         self.screen.blits(render_list)
         pygame.display.update()
 
@@ -366,7 +358,7 @@ class Renderer:
         """
         for row_idx, board_row in enumerate(self.puzzle.board):
             for col_idx, symbol in enumerate(board_row):
-                self.__render_symbol(row_idx, col_idx, symbol, BLACK)
+                self.__render_symbol(row_idx, col_idx, symbol, colors.MAIN_SYMBOL)
 
     def __render_draft(self) -> None:
         """
@@ -378,10 +370,10 @@ class Renderer:
                 new_symbol = self.puzzle.board[row_idx][col_idx]
             else:
                 new_symbol = self.draft_symbol
-            self.__render_symbol(row_idx, col_idx, new_symbol, GRAY)
+            self.__render_symbol(row_idx, col_idx, new_symbol, colors.DRAFT_SYMBOL)
 
     def __render_symbol(self, row_idx: int, col_idx: int,
-        symbol: str, color: tuple = BLACK) -> Optional[pygame.Rect]:
+        symbol: str, color: tuple = colors.MAIN_SYMBOL) -> Optional[pygame.Rect]:
         """
         Render a symbol on the symbols surface.
         """
@@ -399,13 +391,13 @@ class Renderer:
                 self.bdr_thick, cell_rect_offset)
 
         if symbol == ' ':
-            return pygame.draw.rect(self.symbol_surface, WHITE, symbol_rect)
+            return pygame.draw.rect(self.symbol_surface, colors.PUZZLE_BG, symbol_rect)
 
         if symbol == '.':
             return pygame.draw.rect(self.symbol_surface, color, symbol_rect)
 
         if symbol == 'x':
-            pygame.draw.rect(self.symbol_surface, WHITE, symbol_rect)
+            pygame.draw.rect(self.symbol_surface, colors.PUZZLE_BG, symbol_rect)
             line_w = 2
             p1, p2 = symbol_rect.topleft, symbol_rect.bottomright
             p2 = p2[0] - line_w, p2[1]
@@ -425,7 +417,7 @@ class Renderer:
     ################################################################################################
 
     def __draw_rect_borders(self, surface: pygame.Surface, thickness: int,
-        rect: Optional[pygame.Rect] = None, flags: int = FLAG_BORDER_ALL, color: tuple = BLACK) -> None:
+        rect: Optional[pygame.Rect] = None, flags: int = FLAG_BORDER_ALL, color: tuple = colors.BORDER) -> None:
         """
         Draw the borders with size and position of the given rect.
 
@@ -470,7 +462,7 @@ class Renderer:
         thickness: int,
         rect: Optional[pygame.Rect] = None,
         offset_outer_bdr: Optional[float] = 0,
-        color: tuple = BLACK) -> None:
+        color: tuple = colors.BORDER) -> None:
         """
         Draw the cell borders.
 
@@ -533,7 +525,7 @@ class Renderer:
                 num = clues[row_idx]
                 cell_rect = utils.get_cell_rect(r_idx, col_idx, self.cell_size, self.cell_size, 
                     self.bdr_thick, cell_rect_offset)
-                text_surface = font.render(str(num), True, BLACK)
+                text_surface = font.render(str(num), True, colors.CLUES_TEXT)
                 text_rect = text_surface.get_rect()
                 x = cell_rect.centerx - text_rect.centerx
                 y = cell_rect.centery - text_rect.centery + (text_rect.height / 12)
@@ -558,7 +550,7 @@ class Renderer:
                 num = clues[col_idx]
                 cell_rect = utils.get_cell_rect(row_idx, c_idx, self.cell_size,
                     self.cell_size, self.bdr_thick, cell_rect_offset)
-                text_surface = font.render(str(num), True, BLACK)
+                text_surface = font.render(str(num), True, colors.CLUES_TEXT)
                 text_rect = text_surface.get_rect()
                 x = cell_rect.centerx - text_rect.centerx
                 y = cell_rect.centery - text_rect.centery + (text_rect.height / 12)
