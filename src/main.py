@@ -74,7 +74,10 @@ def handle_mouse_down(event: pygame.event.Event, renderer: Renderer) -> None:
     is_lmb, is_mmb, is_rmb = pygame.mouse.get_pressed(3)
     curr_x, curr_y = pygame.mouse.get_pos()
 
-    if is_lmb:
+    if is_lmb and is_rmb:
+        renderer.end_draft()
+
+    elif is_lmb:
         row_idx, col_idx = renderer.screen_to_board_coords(curr_x, curr_y)
         if (row_idx >= 0 and row_idx < renderer.puzzle.nrows and 
             col_idx >= 0 and col_idx < renderer.puzzle.ncols):
@@ -87,7 +90,7 @@ def handle_mouse_down(event: pygame.event.Event, renderer: Renderer) -> None:
                 new_symbol = ' '
             renderer.start_draft(row_idx, col_idx, new_symbol)
 
-    if is_mmb:
+    elif is_mmb:
         renderer.start_drag(curr_x, curr_y)
 
     renderer.render()
