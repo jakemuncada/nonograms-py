@@ -44,8 +44,6 @@ class Renderer:
 
         self.puzzle: Puzzle = None
         """The puzzle object."""
-        self.total_rows: int = 0
-        self.total_cols: int = 0
 
         self.cell_size: int = 0
         """The current size of the cell in pixels, including the zoom amount."""
@@ -104,8 +102,6 @@ class Renderer:
         """
         logger.info(f'Initializing {puzzle.nrows}x{puzzle.ncols} puzzle...')
         self.puzzle = puzzle
-        self.total_rows = puzzle.nrows + puzzle.max_row_clues
-        self.total_cols = puzzle.ncols + puzzle.max_col_clues
         self.initialize_surfaces()
 
     def initialize_surfaces(self) -> None:
