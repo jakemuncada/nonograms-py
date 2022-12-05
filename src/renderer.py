@@ -421,8 +421,9 @@ class Renderer:
             p2c = p2[0] - 1,    p2[1]
 
             pygame.draw.aaline(self.symbol_surface, color, p1, p2, 0)
-            pygame.draw.aaline(self.symbol_surface, color, p1b, p2b, 0)
-            pygame.draw.aaline(self.symbol_surface, color, p1c, p2c, 0)
+            if self.cell_size > 16:
+                pygame.draw.aaline(self.symbol_surface, color, p1b, p2b, 0)
+                pygame.draw.aaline(self.symbol_surface, color, p1c, p2c, 0)
 
             p1, p2 = symbol_rect.bottomleft, symbol_rect.topright
             p2 = p2[0] - line_w / 2, p2[1]
@@ -433,8 +434,9 @@ class Renderer:
             p2c = p2[0] - 1,    p2[1]
 
             pygame.draw.aaline(self.symbol_surface, color, p1, p2, 0)
-            pygame.draw.aaline(self.symbol_surface, color, p1b, p2b, 0)
-            pygame.draw.aaline(self.symbol_surface, color, p1c, p2c, 0)
+            if self.cell_size > 16:
+                pygame.draw.aaline(self.symbol_surface, color, p1b, p2b, 0)
+                pygame.draw.aaline(self.symbol_surface, color, p1c, p2c, 0)
 
         else:
             logger.error(f'Cannot render unknown symbol: {symbol}')
