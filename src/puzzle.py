@@ -2,6 +2,13 @@
 The nonogram puzzle model.
 """
 
+import logging
+
+
+logger = logging.getLogger(__name__)
+console = logging.getLogger('console')
+
+
 class Puzzle:
     """
     The nonogram puzzle model.
@@ -35,48 +42,51 @@ class Puzzle:
         self.__max_col_clues = max_clues
 
     @classmethod
-    def get_sample(cls):
+    def from_json(cls, json_data):
         """
-        Get a sample puzzle.
+        Instantiate a puzzle from json.
         """
-        row_clues = [
-            [1, 1, 1],
-            [4, 2],
-            [5, 1, 1, 3],
-            [4, 2],
-            [5, 1, 3],
-            [5, 1, 3],
-            [4, 4],
-            [1, 6, 3],
-            [1, 4, 2],
-            [3, 5],
-            [3, 5, 1],
-            [3, 4, 1],
-            [4, 5],
-            [11],
-            [7],
-        ]
+        nrows: int = json_data['nrows']
+        ncols: int = json_data['ncols']
+        left_clues_str_list: list[str] = json_data['left_clues']
+        top_clues_str_list: list[str] = json_data['top_clues']
 
-        col_clues = [
-            [1, 5],
-            [2, 7],
-            [2, 7],
-            [4, 1, 2],
-            [6, 1],
-            [6, 1, 1],
-            [2, 5, 2],
-            [2, 4, 1],
-            [2, 4, 1],
-            [2, 4, 2],
-            [3, 8],
-            [3, 1, 6],
-            [5, 5],
-            [4, 4],
-            [2, 1, 1],
-        ]
+        if len(left_clues_str_list) != nrows:
+            logger.error(f'Failed to instantiate puzzle from json, '
+                         f'the left clues list has {len(left_clues_str_list)} while nrows is {nrows}.')
+                         
+        if len(top_clues_str_list) != ncols:
+            logger.error(f'Failed to instantiate puzzle from json, '
+                         f'the top clues list has {len(top_clues_str_list)} while ncols is {ncols}.')
 
-        puzzle = cls(15, 15, row_clues, col_clues)
-        return puzzle
+        row_clues: list[list[int]] = []
+        col_clues: list[list[int]] = []
+
+        for clue_str in left_clues_str_list:
+            row: list[int] = []
+            for clue_val_str in clue_str.strip().split(' '):
+                clue_val = int(clue_val_str)
+                if clue_val > 0:
+                    row.insert(0, clue_val)
+            row_clues.append(row)
+            
+        grid: list[list[int]] = []
+        for clue_str in top_clues_str_list:
+            clues = list(map(int, clue_str.strip().split(' ')))
+            grid.append(clues)
+        
+        grid_nrows = len(grid)
+        grid_ncols = len(grid[0])
+        for c in range(grid_ncols):
+            clues = []
+            for r in range(grid_nrows - 1, -1, -1):
+                num = grid[r][c]
+                if num <= 0:
+                    break
+                clues.append(num)
+            col_clues.append(clues)
+        
+        return cls(nrows, ncols, row_clues, col_clues)
 
     @property
     def nrows(self) -> int:

@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import pygame
 import logging
 
@@ -30,7 +31,11 @@ def main():
     """Main function."""
 
     try:
-        puzzle = Puzzle.get_sample()
+        # Open a sample puzzle.
+        with open('./src/data/puzzles.json', 'r') as f:
+            data = json.load(f)
+        puzzle = Puzzle.from_json(data[1])
+
         renderer = Renderer(SCREEN)
         renderer.initialize_puzzle(puzzle)
         renderer.render()
