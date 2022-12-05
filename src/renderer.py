@@ -4,8 +4,8 @@ Module for rendering the game to the screen.
 
 import pygame
 import logging
-import pygame.gfxdraw
 from typing import Optional
+from functools import lru_cache
 
 from src.coord import Coord
 from src.puzzle import Puzzle
@@ -31,15 +31,20 @@ class Renderer:
 
         self.__fonts: list[pygame.font.Font] = []
         """The list of fonts."""
-        self.__fonts.append(pygame.font.SysFont('consolas', 6))
-        self.__fonts.append(pygame.font.SysFont('consolas', 10))
-        self.__fonts.append(pygame.font.SysFont('consolas', 13))
-        self.__fonts.append(pygame.font.SysFont('consolas', 16))
-        self.__fonts.append(pygame.font.SysFont('consolas', 20))
-        self.__fonts.append(pygame.font.SysFont('consolas', 24))
-        self.__fonts.append(pygame.font.SysFont('consolas', 28))
-        self.__fonts.append(pygame.font.SysFont('consolas', 32))
+        self.__fonts.append(pygame.font.SysFont('consolas', 40))
         self.__fonts.append(pygame.font.SysFont('consolas', 36))
+        self.__fonts.append(pygame.font.SysFont('consolas', 32))
+        self.__fonts.append(pygame.font.SysFont('consolas', 28))
+        self.__fonts.append(pygame.font.SysFont('consolas', 24))
+        self.__fonts.append(pygame.font.SysFont('consolas', 20))
+        self.__fonts.append(pygame.font.SysFont('consolas', 18))
+        self.__fonts.append(pygame.font.SysFont('consolas', 16))
+        self.__fonts.append(pygame.font.SysFont('consolas', 14))
+        self.__fonts.append(pygame.font.SysFont('consolas', 12))
+        self.__fonts.append(pygame.font.SysFont('consolas', 10))
+        self.__fonts.append(pygame.font.SysFont('consolas', 8))
+        self.__fonts.append(pygame.font.SysFont('consolas', 6))
+        self.__fonts.append(pygame.font.SysFont('consolas', 4))
 
         self.puzzle: Puzzle = None
         """The puzzle object."""
@@ -569,7 +574,7 @@ class Renderer:
         Draw the top clues cell numbers.
         """
         render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
-        font = self.__get_font(self.cell_size, self.cell_size)
+        font = self.__get_font(self.cell_size)
 
         cell_rect_offset = (self.outer_bdr, self.outer_bdr, 0, 0)
 
@@ -594,7 +599,7 @@ class Renderer:
         Draw the left clues cell numbers.
         """
         render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
-        font = self.__get_font(self.cell_size, self.cell_size)
+        font = self.__get_font(self.cell_size)
 
         cell_rect_offset = (self.outer_bdr, self.outer_bdr, 0, 0)
 
@@ -614,25 +619,14 @@ class Renderer:
 
         self.left_clues_surface.blits(render_list)
 
-    def __get_font(self, cell_width: float, cell_height: float) -> pygame.font.Font:
+    @lru_cache
+    def __get_font(self, cell_size: int) -> pygame.font.Font:
         """
         Get the optimal font for the cell with the given size.
         """
-        mini = min(cell_width, cell_height)
-        if mini >= 45:
-            return self.__fonts[-1]
-        if mini >= 42:
-            return self.__fonts[-2]
-        if mini >= 38:
-            return self.__fonts[-3]
-        if mini >= 34:
-            return self.__fonts[-4]
-        if mini >= 30:
-            return self.__fonts[-5]
-        if mini >= 27:
-            return self.__fonts[-6]
-        if mini >= 22:
-            return self.__fonts[-7]
-        if mini >= 12:
-            return self.__fonts[-8]
-        return self.__fonts[-9]
+        padding = 2
+        for font in self.__fonts:
+            w, h = font.size('99')
+            if w + padding < cell_size and h + padding < cell_size:
+                return font
+        return self.__fonts[-1]
