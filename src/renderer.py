@@ -116,13 +116,6 @@ class Renderer:
         top_clues_nrows = self.puzzle.max_col_clues
         left_clues_ncols = self.puzzle.max_row_clues
 
-        # # Determine the border sizes.
-        # if nrows >= 40 or ncols >= 40:
-        #     self.cell_bdr = 1
-        # else:
-        #     self.cell_bdr = 2
-        # self.outer_bdr = self.cell_bdr * 2
-
         # Calculate the optimum cell size where the puzzle fills the screen.
         optimum_cell_size = utils.calc_optimum_cell_size(nrows, ncols,
             self.cell_bdr, self.outer_bdr, top_clues_nrows, left_clues_ncols)
@@ -132,13 +125,6 @@ class Renderer:
         self.__cell_size_zoom_amt = max(min_zoom_amt, self.__cell_size_zoom_amt)
         # Then, apply the magnification (zoom in/out).
         self.cell_size = optimum_cell_size + self.__cell_size_zoom_amt
-
-        # # Readjust the borders.
-        # if self.cell_size <= 30:
-        #     self.cell_bdr = 1
-        # else:
-        #     self.cell_bdr = 2
-        # self.outer_bdr = self.cell_bdr * 2
 
         # Ensure that cell_size is EVEN.
         self.cell_size = self.cell_size if self.cell_size % 2 == 0 else self.cell_size - 1
