@@ -189,6 +189,9 @@ class Renderer:
         self.__draw_clues_numbers(self.left_clues_surface, self.puzzle.left_clues_grid,
             cellsz, cellsz, self.outer_bdr, self.cell_bdr, self.sep_bdr, colors.BLACK)
 
+        # Draw the symbols.
+        self.update_symbols()
+
     ################################################################################################
     # COORDINATE & RECT GETTER METHODS
     ################################################################################################
@@ -341,10 +344,6 @@ class Renderer:
         """
         Render the current puzzle.
         """
-        self.symbol_surface.fill(colors.PUZZLE_BG)
-        self.__render_symbols()
-        self.__render_draft()
-
         render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
 
         board_rect = self.get_actual_board_rect()
@@ -363,13 +362,24 @@ class Renderer:
         self.screen.blits(render_list)
         pygame.display.update()
 
+    def update_symbols(self) -> None:
+        """
+        Update the symbols.
+
+        Draws the symbols and the draft symbols onto the symbols surface.
+        """
+        self.symbol_surface.fill(colors.PUZZLE_BG)
+        self.__render_symbols()
+        self.__render_draft()
+
     def __render_symbols(self) -> None:
         """
         Render the symbols onto the symbols surface.
         """
         for row_idx, board_row in enumerate(self.puzzle.board):
             for col_idx, symbol in enumerate(board_row):
-                self.__render_symbol(row_idx, col_idx, symbol, colors.MAIN_SYMBOL)
+                self.__draw_symbol(self.symbol_surface, row_idx, col_idx, self.cell_size,
+                    self.outer_bdr, self.cell_bdr, self.sep_bdr, symbol, colors.MAIN_SYMBOL)
 
     def __render_draft(self) -> None:
         """
@@ -381,82 +391,8 @@ class Renderer:
                 new_symbol = self.puzzle.board[row_idx][col_idx]
             else:
                 new_symbol = self.draft_symbol
-            self.__render_symbol(row_idx, col_idx, new_symbol, colors.DRAFT_SYMBOL)
-
-    def __render_symbol(self, row_idx: int, col_idx: int,
-        symbol: str, color: tuple = colors.MAIN_SYMBOL) -> Optional[pygame.Rect]:
-        """
-        Render a symbol on the symbols surface.
-        """
-        if symbol == ' ':
-            return None
-
-        if self.cell_size <= 6:
-            offset_amount = 0
-        elif self.cell_size < 18:
-            offset_amount = 1
-        elif self.cell_size < 28:
-            offset_amount = 2
-        elif self.cell_size < 50:
-            offset_amount = 3
-        else:
-            offset_amount = int(self.cell_size * 0.06)
-
-        offset_x = offset_amount + self.outer_bdr
-        offset_y = offset_amount + self.outer_bdr
-        offset_w = offset_amount * -2
-        offset_h = offset_amount * -2
-
-        cell_rect_offset = (offset_x, offset_y, offset_w, offset_h)
-        symbol_rect = utils.get_cell_rect(row_idx, col_idx, self.cell_size, self.cell_size,
-            self.cell_bdr, self.sep_bdr, cell_rect_offset)
-
-        # Erase the current symbol.
-        pygame.draw.rect(self.symbol_surface, colors.PUZZLE_BG, symbol_rect)
-
-        if symbol == ' ':
-            # Do nothing for BLANK cells.
-            pass
-
-        elif symbol == '.':
-            pygame.draw.rect(self.symbol_surface, color, symbol_rect)
-
-        elif symbol == 'x':
-            line_w = 2
-            blend = 1 if color == colors.DRAFT_SYMBOL else 0
-
-            p1, p2 = symbol_rect.topleft, symbol_rect.bottomright
-            p2 = p2[0] - line_w / 2, p2[1]
-
-            p1b = p1[0] + 1,    p1[1]
-            p1c = p1[0],        p1[1] + 1
-            p2b = p2[0],        p2[1] - 1
-            p2c = p2[0] - 1,    p2[1]
-
-            pygame.draw.aaline(self.symbol_surface, color, p1, p2, blend)
-            if self.cell_size > 16:
-                pygame.draw.aaline(self.symbol_surface, color, p1b, p2b, blend)
-                pygame.draw.aaline(self.symbol_surface, color, p1c, p2c, blend)
-
-            p1, p2 = symbol_rect.bottomleft, symbol_rect.topright
-            p2 = p2[0] - line_w / 2, p2[1]
-
-            p1b = p1[0] + 1,    p1[1]
-            p1c = p1[0],        p1[1] - 1
-            p2b = p2[0],        p2[1] + 1
-            p2c = p2[0] - 1,    p2[1]
-
-            pygame.draw.aaline(self.symbol_surface, color, p1, p2, blend)
-            if self.cell_size > 16:
-                pygame.draw.aaline(self.symbol_surface, color, p1b, p2b, blend)
-                pygame.draw.aaline(self.symbol_surface, color, p1c, p2c, blend)
-
-        else:
-            logger.error(f'Cannot render unknown symbol: {symbol}')
-            return None
-            
-        return symbol_rect
-        
+            self.__draw_symbol(self.symbol_surface, row_idx, col_idx, self.cell_size,
+                self.outer_bdr, self.cell_bdr, self.sep_bdr, new_symbol, colors.DRAFT_SYMBOL)
 
     ################################################################################################
     # DRAW HELPER METHODS
@@ -604,6 +540,83 @@ class Renderer:
                 render_list.append((text_surface, draw_rect))
 
         surface.blits(render_list)
+
+    def __draw_symbol(self, surface: pygame.Surface, row_idx: int, col_idx: int,
+        cell_size: int, outer_bdr: int, cell_bdr: int, sep_bdr: int, symbol: str,
+        color: tuple) -> Optional[pygame.Rect]:
+        """
+        Render a symbol on the symbols surface.
+        """
+        if symbol == ' ':
+            return None
+
+        # Calculate the padding between the symbol and the cell borders.
+        if cell_size <= 6:
+            padding = 0
+        elif cell_size < 18:
+            padding = 1
+        elif cell_size < 28:
+            padding = 2
+        elif cell_size < 50:
+            padding = 3
+        else:
+            padding = int(cell_size * 0.06)
+
+        offset_x = padding + outer_bdr
+        offset_y = padding + outer_bdr
+        offset_w = padding * -2
+        offset_h = padding * -2
+
+        # Get the rect that encloses the symbol.
+        cell_rect_offset = (offset_x, offset_y, offset_w, offset_h)
+        symbol_rect = utils.get_cell_rect(row_idx, col_idx, cell_size, cell_size,
+            cell_bdr, sep_bdr, cell_rect_offset)
+
+        # Erase the current symbol.
+        pygame.draw.rect(surface, colors.PUZZLE_BG, symbol_rect)
+
+        if symbol == ' ':
+            # Do nothing for BLANK cells.
+            pass
+
+        elif symbol == '.':
+            pygame.draw.rect(surface, color, symbol_rect)
+
+        elif symbol == 'x':
+            line_w = 2
+            blend = 1 if color == colors.DRAFT_SYMBOL else 0
+
+            p1, p2 = symbol_rect.topleft, symbol_rect.bottomright
+            p2 = p2[0] - line_w / 2, p2[1]
+
+            p1b = p1[0] + 1,    p1[1]
+            p1c = p1[0],        p1[1] + 1
+            p2b = p2[0],        p2[1] - 1
+            p2c = p2[0] - 1,    p2[1]
+
+            pygame.draw.aaline(surface, color, p1, p2, blend)
+            if cell_size > 16:
+                pygame.draw.aaline(surface, color, p1b, p2b, blend)
+                pygame.draw.aaline(surface, color, p1c, p2c, blend)
+
+            p1, p2 = symbol_rect.bottomleft, symbol_rect.topright
+            p2 = p2[0] - line_w / 2, p2[1]
+
+            p1b = p1[0] + 1,    p1[1]
+            p1c = p1[0],        p1[1] - 1
+            p2b = p2[0],        p2[1] + 1
+            p2c = p2[0] - 1,    p2[1]
+
+            pygame.draw.aaline(surface, color, p1, p2, blend)
+            if cell_size > 16:
+                pygame.draw.aaline(surface, color, p1b, p2b, blend)
+                pygame.draw.aaline(surface, color, p1c, p2c, blend)
+
+        else:
+            logger.error(f'Cannot render unknown symbol: {symbol}')
+            return None
+            
+        return symbol_rect
 
     @lru_cache
     def __get_font(self, cell_size: int) -> pygame.font.Font:

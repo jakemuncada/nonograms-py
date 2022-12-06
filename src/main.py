@@ -34,7 +34,7 @@ def main():
         # Open a sample puzzle.
         with open('./src/data/puzzles.json', 'r') as f:
             data = json.load(f)
-        puzzle = Puzzle.from_json(data[0])
+        puzzle = Puzzle.from_json(data[1])
 
         renderer = Renderer(SCREEN)
         renderer.initialize_puzzle(puzzle)
@@ -93,6 +93,7 @@ def handle_mouse_down(event: pygame.event.Event, renderer: Renderer) -> None:
     elif is_mmb:
         renderer.start_drag(curr_x, curr_y)
 
+    renderer.update_symbols()
     renderer.render()
 
 def handle_mouse_up(event: pygame.event.Event, renderer: Renderer) -> None:
@@ -110,6 +111,7 @@ def handle_mouse_up(event: pygame.event.Event, renderer: Renderer) -> None:
     if not is_mmb:
         renderer.end_drag()
 
+    renderer.update_symbols()
     renderer.render()
 
 def handle_mouse_move(event: pygame.event.Event, renderer: Renderer) -> None:
@@ -124,6 +126,7 @@ def handle_mouse_move(event: pygame.event.Event, renderer: Renderer) -> None:
         if (row_idx >= 0 and row_idx < renderer.puzzle.nrows and 
             col_idx >= 0 and col_idx < renderer.puzzle.ncols):
            renderer.update_draft(row_idx, col_idx)
+           renderer.update_symbols()
            renderer.render()
 
     if is_mmb and renderer.is_dragging:
