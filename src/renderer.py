@@ -2,6 +2,10 @@
 Module for rendering the game to the screen.
 """
 
+# TODO
+# Refactor the Renderer to only strictly handle rendering stuff.
+# Create another class (maybe called Controller) to handle the logic stuff?
+
 import pygame
 import logging
 from typing import Optional
@@ -119,12 +123,12 @@ class Renderer:
         """
         nrows = self.puzzle.nrows
         ncols = self.puzzle.ncols
-        top_clues_nrows = self.puzzle.max_col_clues
-        left_clues_ncols = self.puzzle.max_row_clues
+        top_nrows = self.puzzle.top_clues_nrows
+        left_ncols = self.puzzle.left_clues_ncols
 
         # Calculate the optimum cell size where the puzzle fills the screen.
         optimum_cell_size = utils.calc_optimum_cell_size(nrows, ncols,
-            self.cell_bdr, self.outer_bdr, self.sep_bdr, top_clues_nrows, left_clues_ncols)
+            self.cell_bdr, self.outer_bdr, self.sep_bdr, top_nrows, left_ncols)
 
         # Clamp the minimum zoom amount.
         min_zoom_amt = Renderer.MINIMUM_CELL_SIZE - optimum_cell_size
@@ -140,7 +144,7 @@ class Renderer:
         # Get the sizes and positions of the board, and the clues panels.
         board_rect, top_clues_rect, left_clues_rect, parent_rect = utils.calc_rects(
             self.cell_size, self.cell_size, self.cell_size, self.cell_bdr, self.outer_bdr,
-            self.sep_bdr, nrows, ncols, top_clues_nrows, left_clues_ncols)
+            self.sep_bdr, nrows, ncols, top_nrows, left_ncols)
 
         # Save the calculated values to their respective properties.
         self.board_rect = board_rect
@@ -173,14 +177,28 @@ class Renderer:
         # Draw the cell borders.
         self.__draw_cell_borders(self.board_surface, nrows, ncols,
             self.cell_size, self.cell_bdr, self.sep_bdr, True, True, None, self.outer_bdr)
-        self.__draw_cell_borders(self.top_clues_surface, top_clues_nrows, ncols,
+        self.__draw_cell_borders(self.top_clues_surface, top_nrows, ncols,
             self.cell_size, self.cell_bdr, self.sep_bdr, False, True, None, self.outer_bdr)
-        self.__draw_cell_borders(self.left_clues_surface, nrows, left_clues_ncols,
+        self.__draw_cell_borders(self.left_clues_surface, nrows, left_ncols,
             self.cell_size, self.cell_bdr, self.sep_bdr, True, False, None, self.outer_bdr)
 
         # Draw the clue numbers.
-        self.__draw_top_clues_numbers()
-        self.__draw_left_clues_numbers()
+        self.__draw_clues_numbers(self.top_clues_surface,
+                                  self.puzzle.top_clues_grid,
+                                  self.cell_size,
+                                  self.cell_size,
+                                  self.outer_bdr,
+                                  self.cell_bdr,
+                                  self.sep_bdr,
+                                  colors.BLACK)
+        self.__draw_clues_numbers(self.left_clues_surface,
+                                  self.puzzle.left_clues_grid,
+                                  self.cell_size,
+                                  self.cell_size,
+                                  self.outer_bdr,
+                                  self.cell_bdr,
+                                  self.sep_bdr,
+                                  colors.BLACK)
 
     ################################################################################################
     # COORDINATE & RECT GETTER METHODS
@@ -464,7 +482,8 @@ class Renderer:
             surface: The surface to draw on.
             thickness: The border thickness.
             rect: The rect that dictates the size and position of the border/s to draw.
-                  If not specified, the border will be drawn on the outer edges of the given surface.
+                  If not specified, the border will be drawn on the outer edges
+                  of the given surface.
             flags: The flag that dictates which border side/s to draw.
                    If not specified, borders on all sides will be drawn.
             color: The border color.
@@ -570,55 +589,32 @@ class Renderer:
                         p2 = (x + sep_idx + 1, rect.y + rect.height + 0.5)
                         pygame.draw.line(surface, color, p1, p2, 1)
 
-    def __draw_top_clues_numbers(self) -> None:
+    def __draw_clues_numbers(self, surface: pygame.Surface, grid: list[list[int]],
+        cell_width: float, cell_height: float, outer_bdr: int, cell_bdr: int,
+        sep_bdr: int, color: tuple) -> None:
         """
-        Draw the top clues cell numbers.
+        Draw the clue numbers.
         """
         render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
-        font = self.__get_font(self.cell_size)
+        font = self.__get_font(min(cell_width, cell_height))
 
-        cell_rect_offset = (self.outer_bdr, self.outer_bdr, 0, 0)
+        cell_rect_offset = (outer_bdr, outer_bdr, 0, 0)
 
-        for col_idx in range(len(self.puzzle.col_clues)):
-            clues = self.puzzle.col_clues[col_idx]
-            for row_idx in range(len(clues)):
-                r_idx = self.puzzle.max_col_clues - row_idx - 1
-                num = clues[row_idx]
-                cell_rect = utils.get_cell_rect(r_idx, col_idx, self.cell_size, self.cell_size, 
-                    self.cell_bdr, self.sep_bdr, cell_rect_offset)
-                text_surface = font.render(str(num), True, colors.CLUES_TEXT)
+        for row_idx in range(len(grid)):
+            for col_idx in range(len(grid[row_idx])):
+                num = grid[row_idx][col_idx]
+                if num <= 0:
+                    continue
+                cell_rect = utils.get_cell_rect(row_idx, col_idx, cell_width, cell_height,
+                    cell_bdr, sep_bdr, cell_rect_offset)
+                text_surface = font.render(str(num), True, color)
                 text_rect = text_surface.get_rect()
                 x = cell_rect.centerx - text_rect.centerx
                 y = cell_rect.centery - text_rect.centery + (text_rect.height / 12)
                 draw_rect = pygame.Rect(x, y, text_rect.width, text_rect.height)
                 render_list.append((text_surface, draw_rect))
 
-        self.top_clues_surface.blits(render_list)
-
-    def __draw_left_clues_numbers(self) -> None:
-        """
-        Draw the left clues cell numbers.
-        """
-        render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
-        font = self.__get_font(self.cell_size)
-
-        cell_rect_offset = (self.outer_bdr, self.outer_bdr, 0, 0)
-
-        for row_idx in range(len(self.puzzle.row_clues)):
-            clues = self.puzzle.row_clues[row_idx]
-            for col_idx in range(len(clues)):
-                c_idx = self.puzzle.max_row_clues - col_idx - 1
-                num = clues[col_idx]
-                cell_rect = utils.get_cell_rect(row_idx, c_idx, self.cell_size,
-                    self.cell_size, self.cell_bdr, self.sep_bdr, cell_rect_offset)
-                text_surface = font.render(str(num), True, colors.CLUES_TEXT)
-                text_rect = text_surface.get_rect()
-                x = cell_rect.centerx - text_rect.centerx
-                y = cell_rect.centery - text_rect.centery + (text_rect.height / 12)
-                draw_rect = pygame.Rect(x, y, text_rect.width, text_rect.height)
-                render_list.append((text_surface, draw_rect))
-
-        self.left_clues_surface.blits(render_list)
+        surface.blits(render_list)
 
     @lru_cache
     def __get_font(self, cell_size: int) -> pygame.font.Font:
