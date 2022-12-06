@@ -426,15 +426,17 @@ class Renderer:
             self.symbol_surface.fill(colors.PUZZLE_BG)
             for row_idx, board_row in enumerate(self.puzzle.board):
                 for col_idx, symbol in enumerate(board_row):
-                    self.__draw_symbol(self.symbol_surface, row_idx, col_idx,
-                        self.cell_size, symbol, colors.MAIN_SYMBOL, erase_cell=False)
+                    cell_rect = self.get_board_cell_rect(row_idx, col_idx)
+                    self.__draw_symbol(self.symbol_surface, cell_rect, self.cell_size, symbol,
+                        colors.MAIN_SYMBOL, erase_cell=False)
 
         # If the mode is DRAFT, redraw the current symbols of only the cells
         # that are orthogonal to the start draft cell.
         elif mode == 'draft':
             for row_idx, col_idx in self.get_draft_start_ortho_cells():
                 symbol = self.puzzle.board[row_idx][col_idx]
-                self.__draw_symbol(self.symbol_surface, row_idx, col_idx,
+                cell_rect = self.get_board_cell_rect(row_idx, col_idx)
+                self.__draw_symbol(self.symbol_surface, cell_rect,
                     self.cell_size, symbol, colors.MAIN_SYMBOL)
         
         # Then, regardless of the mode, render the draft symbols (but only if currently drafting).
@@ -444,8 +446,10 @@ class Renderer:
                     new_symbol = self.puzzle.board[row_idx][col_idx]
                 else:
                     new_symbol = self.draft_symbol
-                self.__draw_symbol(self.symbol_surface, row_idx, col_idx,
-                    self.cell_size, new_symbol, colors.DRAFT_SYMBOL)
+                
+                cell_rect = self.get_board_cell_rect(row_idx, col_idx)
+                self.__draw_symbol(self.symbol_surface, cell_rect, self.cell_size,
+                    new_symbol, colors.DRAFT_SYMBOL)
 
     ################################################################################################
     # DRAW HELPER METHODS
@@ -594,7 +598,7 @@ class Renderer:
 
         surface.blits(render_list)
 
-    def __draw_symbol(self, surface: pygame.Surface, row_idx: int, col_idx: int,
+    def __draw_symbol(self, surface: pygame.Surface, cell_rect: pygame.Rect,
         cell_size: int, symbol: str, color: tuple, erase_cell: bool = True) -> None:
         """
         Render a symbol on the symbols surface.
@@ -615,7 +619,6 @@ class Renderer:
             padding = int(cell_size * 0.06)
 
         # Get the rect that encloses the cell and the rect that encloses the symbol.
-        cell_rect = self.get_board_cell_rect(row_idx, col_idx)
         symbol_rect = pygame.Rect(cell_rect.x + padding,
                                   cell_rect.y + padding,
                                   cell_rect.width + padding * -2,
