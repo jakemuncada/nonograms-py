@@ -197,3 +197,33 @@ def get_cell_rect(
 
     return pygame.Rect(x + offset_x, y + offset_y,
         width + offset_w, height + offset_h)
+
+
+def screen_to_board_coords(screen_x: float, screen_y: float, board_rect: pygame.Rect,
+    cell_size: int, cell_bdr: int, sep_bdr: int) -> tuple[int, int]:
+    """
+    Convert a point in the screen coordinates to its board coordinates,
+    i.e. the board row index and column index.
+    """
+    # Calculate the specified coordinates relative to the board rect.
+    board_x = screen_x - board_rect.x
+    board_y = screen_y - board_rect.y
+
+    # Calculate the width of one separator-group, including the sep_bdr itself.
+    sep_grp_width = ((cell_size + cell_bdr) * 5) + (sep_bdr - cell_bdr)
+    # Calculate which separator-group the coordinates are in.
+    sep_grp_idx_x = board_x // sep_grp_width
+    sep_grp_idx_y = board_y // sep_grp_width
+
+    # Calculate which cell in the separator-group the coordinates are in.
+    mod_x = (abs(board_x) - (sep_grp_idx_x * sep_grp_width)) * (-1 if board_x < 0 else 1)
+    mod_y = abs(board_y) - (sep_grp_idx_y * sep_grp_width) * (-1 if board_y < 0 else 1)
+    cell_idx_x = mod_x // (cell_size + cell_bdr)
+    cell_idx_y = mod_y // (cell_size + cell_bdr)
+    cell_idx_x = min(4, cell_idx_x)
+    cell_idx_y = min(4, cell_idx_y)
+
+    row_idx = (sep_grp_idx_y * 5) + cell_idx_y
+    col_idx = (sep_grp_idx_x * 5) + cell_idx_x
+
+    return int(row_idx), int(col_idx)

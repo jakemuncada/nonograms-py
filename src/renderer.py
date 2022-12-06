@@ -246,35 +246,12 @@ class Renderer:
         Convert a point in the screen coordinates to its board coordinates,
         i.e. the board row index and column index.
         """
-        cellsz = self.cell_size
-        cellbdr = self.cell_bdr
-
         # Get the board rect. Remove the outer borders.
         board_rect = self.get_actual_board_rect()
         board_rect.inflate_ip(self.outer_bdr * -2, self.outer_bdr * -2)
-
-        # Calculate the specified coordinates relative to the board rect.
-        board_x = screen_x - board_rect.x
-        board_y = screen_y - board_rect.y
-
-        # Calculate the width of one separator-group, including the sep_bdr itself.
-        sep_grp_width = ((cellsz + cellbdr) * 5) + (self.sep_bdr - cellbdr)
-        # Calculate which separator-group the coordinates are in.
-        sep_grp_idx_x = board_x // sep_grp_width
-        sep_grp_idx_y = board_y // sep_grp_width
-
-        # Calculate which cell in the separator-group the coordinates are in.
-        mod_x = (abs(board_x) - (sep_grp_idx_x * sep_grp_width)) * (-1 if board_x < 0 else 1)
-        mod_y = abs(board_y) - (sep_grp_idx_y * sep_grp_width) * (-1 if board_y < 0 else 1)
-        cell_idx_x = mod_x // (cellsz + cellbdr)
-        cell_idx_y = mod_y // (cellsz + cellbdr)
-        cell_idx_x = min(4, cell_idx_x)
-        cell_idx_y = min(4, cell_idx_y)
-
-        row_idx = (sep_grp_idx_y * 5) + cell_idx_y
-        col_idx = (sep_grp_idx_x * 5) + cell_idx_x
-
-        return int(row_idx), int(col_idx)
+        
+        return utils.screen_to_board_coords(screen_x, screen_y,
+            board_rect, self.cell_size, self.cell_bdr, self.sep_bdr)
 
     def get_draft_cell_indices(self) -> list[tuple[int, int]]:
         """
