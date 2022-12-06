@@ -27,14 +27,16 @@ pygame.display.set_caption("Nonograms")
 #  MAIN
 ####################################################################################################
 
-def main():
+def main(args: list[str]):
     """Main function."""
 
     try:
+        puzzle_idx = int(args[1]) if len(args) > 1 and args[1].isnumeric() else 0
+
         # Open a sample puzzle.
         with open('./src/data/puzzles.json', 'r') as f:
             data = json.load(f)
-        puzzle = Puzzle.from_json(data[1])
+        puzzle = Puzzle.from_json(data[puzzle_idx])
 
         renderer = Renderer(SCREEN)
         renderer.initialize_puzzle(puzzle)

@@ -82,6 +82,8 @@ class Puzzle:
                 row = [ False for _ in range(self.__left_clues_ncols) ]
                 self.left_clues_ticks.append(row)
 
+        console.info(f'Successfully created a {nrows}x{ncols} puzzle.')
+
     @classmethod
     def from_json(cls, json_data):
         """
