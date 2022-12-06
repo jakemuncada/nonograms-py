@@ -35,5 +35,5 @@ def init_loggers():
     # Set the log level to DEBUG so that everything will be written to the log file
     f_handler.setLevel(logging.DEBUG)
 
-    # Add the file handlser to the root logger
+    # Add the file handler to the root logger
     logging.getLogger().addHandler(f_handler)
