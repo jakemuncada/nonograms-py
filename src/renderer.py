@@ -6,11 +6,6 @@ Module for rendering the game to the screen.
 # Refactor the Renderer to only strictly handle rendering stuff.
 # Create another class (maybe called Controller) to handle the logic stuff?
 
-# TODO
-# Do not use Coord as a row-column index.
-# Coord should only be used as pixel coordinates.
-# Maybe create a new class called RowCol?
-
 import pygame
 import logging
 from typing import Optional
