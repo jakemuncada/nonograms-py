@@ -199,7 +199,7 @@ def get_cell_rect(
         width + offset_w, height + offset_h)
 
 
-def screen_to_board_coords(screen_x: float, screen_y: float, board_rect: pygame.Rect,
+def screen_coord_to_cell_idx(screen_x: float, screen_y: float, board_rect: pygame.Rect,
     cell_size: int, cell_bdr: int, sep_bdr: int) -> tuple[int, int]:
     """
     Convert a point in the screen coordinates to its board coordinates,

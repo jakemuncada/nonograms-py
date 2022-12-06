@@ -17,6 +17,7 @@ from typing import Optional
 from functools import lru_cache
 
 from src.coord import Coord
+from src.cell_idx import CellIdx
 from src.puzzle import Puzzle
 import src.colors as colors
 import src.utils.render_utils as utils
@@ -67,14 +68,22 @@ class Renderer:
         """
 
         self.__pan_delta: Coord = Coord((0, 0))
-        self.__pan_orig_xy: Coord = None
+        """The amount by which the whole puzzle is panned."""
+        self.__pan_orig_coord: Coord = None
+        """The original screen coordinates where the drag event originated."""
         self.__pan_orig_delta: Coord = None
+        """The original pan delta when then drag event started."""
         self.is_dragging = False
+        """True if the puzzle is currently being dragged."""
 
-        self.draft_start_cell: Coord = None
-        self.draft_end_cell: Coord = None
+        self.draft_start_cell: CellIdx = None
+        """The cell index where the draft started."""
+        self.draft_end_cell: CellIdx = None
+        """The cell index where the draft ends. Must be orthogonal to the start cell."""
         self.draft_symbol = '.'
+        """The symbol currently being drafted."""
         self.is_drafting = False
+        """True if the puzzle is currently being drafted."""
 
         self.cell_bdr = 1
         """The cell border thickness."""
@@ -89,6 +98,7 @@ class Renderer:
         self.parent_rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
 
         self.__cell_rect_memo: dict[tuple[int, int], pygame.Rect] = {}
+        """Memoization dictionary for storing the rects of each cell. Key is the row-col index."""
 
         self.board_surface: pygame.Surface = None
         """The base board surface that contains the base grid."""
@@ -241,7 +251,7 @@ class Renderer:
         board_rect.inflate_ip(self.outer_bdr * -2, self.outer_bdr * -4)
         return board_rect.collidepoint(coord_x, coord_y)
 
-    def screen_to_board_coords(self, screen_x: float, screen_y: float) -> tuple[int, int]:
+    def screen_coord_to_cell_idx(self, screen_x: float, screen_y: float) -> CellIdx:
         """
         Convert a point in the screen coordinates to its board coordinates,
         i.e. the board row index and column index.
@@ -250,14 +260,14 @@ class Renderer:
         board_rect = self.get_actual_board_rect()
         board_rect.inflate_ip(self.outer_bdr * -2, self.outer_bdr * -2)
         
-        return utils.screen_to_board_coords(screen_x, screen_y,
-            board_rect, self.cell_size, self.cell_bdr, self.sep_bdr)
+        return CellIdx(utils.screen_coord_to_cell_idx(screen_x, screen_y,
+            board_rect, self.cell_size, self.cell_bdr, self.sep_bdr))
 
-    def get_draft_cell_indices(self) -> list[tuple[int, int]]:
+    def get_draft_cell_indices(self) -> list[CellIdx]:
         """
         Get the row/col indices of the draft cells.
         """
-        cells = []
+        cells: list[CellIdx] = []
         if not self.is_drafting:
             return cells
         
@@ -266,20 +276,20 @@ class Renderer:
             return cells
         
         # If the draft is vertical.
-        if self.draft_start_cell.x == self.draft_end_cell.x:
-            x = self.draft_start_cell.x
-            min_y = min(self.draft_start_cell.y, self.draft_end_cell.y)
-            max_y = max(self.draft_start_cell.y, self.draft_end_cell.y)
-            for y in range(min_y, max_y + 1):
-                cells.append((x, y))
+        if self.draft_start_cell.col == self.draft_end_cell.col:
+            col = self.draft_start_cell.col
+            min_row = min(self.draft_start_cell.row, self.draft_end_cell.row)
+            max_row = max(self.draft_start_cell.row, self.draft_end_cell.row)
+            for row in range(min_row, max_row + 1):
+                cells.append(CellIdx(row, col))
         
         # Else if the draft is horizontal.
-        elif self.draft_start_cell.y == self.draft_end_cell.y:
-            y = self.draft_start_cell.y
-            min_x = min(self.draft_start_cell.x, self.draft_end_cell.x)
-            max_x = max(self.draft_start_cell.x, self.draft_end_cell.x)
-            for x in range(min_x, max_x + 1):
-                cells.append((x, y))
+        elif self.draft_start_cell.row == self.draft_end_cell.row:
+            row = self.draft_start_cell.row
+            min_col = min(self.draft_start_cell.col, self.draft_end_cell.col)
+            max_col = max(self.draft_start_cell.col, self.draft_end_cell.col)
+            for col in range(min_col, max_col + 1):
+                cells.append(CellIdx(row, col))
 
         # Else if the draft is neither vertical nor horizontal.
         else:
@@ -288,7 +298,7 @@ class Renderer:
 
         return cells
 
-    def get_draft_start_ortho_cells(self) -> list[tuple[int, int]]:
+    def get_draft_start_ortho_cells(self) -> list[CellIdx]:
         """
         Get the row/col indices of the cells that are orthogonal to the draft start cell,
         including the draft start cell itself.
@@ -302,10 +312,10 @@ class Renderer:
             return cells
 
         for row_idx in range(self.puzzle.nrows):
-            cells.append((row_idx, self.draft_start_cell.y))
+            cells.append((row_idx, self.draft_start_cell.col))
 
         for col_idx in range(self.puzzle.ncols):
-            cells.append((self.draft_start_cell.x, col_idx))
+            cells.append((self.draft_start_cell.row, col_idx))
 
         return cells
 
@@ -317,7 +327,7 @@ class Renderer:
         """
         Start dragging.
         """
-        self.__pan_orig_xy = Coord((curr_x, curr_y))
+        self.__pan_orig_coord = Coord((curr_x, curr_y))
         self.__pan_orig_delta = self.pan_delta
         self.is_dragging = True
 
@@ -325,7 +335,7 @@ class Renderer:
         """
         Update the pan delta.
         """
-        orig_x, orig_y = self.__pan_orig_xy
+        orig_x, orig_y = self.__pan_orig_coord
         delta_x = curr_x - orig_x
         delta_y = curr_y - orig_y
         self.__pan_delta = self.__pan_orig_delta.move((delta_x, delta_y))
@@ -334,7 +344,7 @@ class Renderer:
         """
         End the drag.
         """
-        self.__pan_orig_xy = None
+        self.__pan_orig_coord = None
         self.__pan_orig_delta = None
         self.is_dragging = False
 
@@ -353,8 +363,8 @@ class Renderer:
         Drafting is editing the puzzle symbols
         but the changes have not yet been finalized.
         """
-        self.draft_start_cell = Coord((row_idx, col_idx))
-        self.draft_end_cell = Coord((row_idx, col_idx))
+        self.draft_start_cell = CellIdx(row_idx, col_idx)
+        self.draft_end_cell = CellIdx(row_idx, col_idx)
         self.draft_symbol = symbol
         self.is_drafting = True
 
@@ -365,12 +375,12 @@ class Renderer:
         Drafting is editing the puzzle symbols
         but the changes have not yet been finalized.
         """
-        vertical_len = abs(self.draft_start_cell.x - row_idx)
-        horizontal_len = abs(self.draft_start_cell.y - col_idx)
+        vertical_len = abs(self.draft_start_cell.row - row_idx)
+        horizontal_len = abs(self.draft_start_cell.col - col_idx)
         if horizontal_len >= vertical_len:
-            self.draft_end_cell = Coord((self.draft_start_cell.x, col_idx))
+            self.draft_end_cell = CellIdx(self.draft_start_cell.row, col_idx)
         else:
-            self.draft_end_cell = Coord((row_idx, self.draft_start_cell.y))
+            self.draft_end_cell = CellIdx(row_idx, self.draft_start_cell.col)
 
     def end_draft(self) -> None:
         """
