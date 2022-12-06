@@ -139,11 +139,12 @@ class Renderer:
         # Ensure that cell_size is EVEN.
         self.cell_size = self.cell_size if self.cell_size % 2 == 0 else self.cell_size - 1
 
-        console.info(f'Reinitializing board, cell size is {self.cell_size}.')
+        cellsz = self.cell_size
+        console.info(f'Reinitializing board, cell size is {cellsz}.')
 
         # Get the sizes and positions of the board, and the clues panels.
         board_rect, top_clues_rect, left_clues_rect, parent_rect = utils.calc_rects(
-            self.cell_size, self.cell_size, self.cell_size, self.cell_bdr, self.outer_bdr,
+            cellsz, cellsz, cellsz, self.cell_bdr, self.outer_bdr,
             self.sep_bdr, nrows, ncols, top_nrows, left_ncols)
 
         # Save the calculated values to their respective properties.
@@ -176,29 +177,17 @@ class Renderer:
 
         # Draw the cell borders.
         self.__draw_cell_borders(self.board_surface, nrows, ncols,
-            self.cell_size, self.cell_bdr, self.sep_bdr, True, True, None, self.outer_bdr)
+            cellsz, self.cell_bdr, self.sep_bdr, True, True, None, self.outer_bdr)
         self.__draw_cell_borders(self.top_clues_surface, top_nrows, ncols,
-            self.cell_size, self.cell_bdr, self.sep_bdr, False, True, None, self.outer_bdr)
+            cellsz, self.cell_bdr, self.sep_bdr, False, True, None, self.outer_bdr)
         self.__draw_cell_borders(self.left_clues_surface, nrows, left_ncols,
-            self.cell_size, self.cell_bdr, self.sep_bdr, True, False, None, self.outer_bdr)
+            cellsz, self.cell_bdr, self.sep_bdr, True, False, None, self.outer_bdr)
 
         # Draw the clue numbers.
-        self.__draw_clues_numbers(self.top_clues_surface,
-                                  self.puzzle.top_clues_grid,
-                                  self.cell_size,
-                                  self.cell_size,
-                                  self.outer_bdr,
-                                  self.cell_bdr,
-                                  self.sep_bdr,
-                                  colors.BLACK)
-        self.__draw_clues_numbers(self.left_clues_surface,
-                                  self.puzzle.left_clues_grid,
-                                  self.cell_size,
-                                  self.cell_size,
-                                  self.outer_bdr,
-                                  self.cell_bdr,
-                                  self.sep_bdr,
-                                  colors.BLACK)
+        self.__draw_clues_numbers(self.top_clues_surface, self.puzzle.top_clues_grid,
+            cellsz, cellsz, self.outer_bdr, self.cell_bdr, self.sep_bdr, colors.BLACK)
+        self.__draw_clues_numbers(self.left_clues_surface, self.puzzle.left_clues_grid,
+            cellsz, cellsz, self.outer_bdr, self.cell_bdr, self.sep_bdr, colors.BLACK)
 
     ################################################################################################
     # COORDINATE & RECT GETTER METHODS
