@@ -6,6 +6,11 @@ Module for rendering the game to the screen.
 # Refactor the Renderer to only strictly handle rendering stuff.
 # Create another class (maybe called Controller) to handle the logic stuff?
 
+# TODO
+# Do not use Coord as a row-column index.
+# Coord should only be used as pixel coordinates.
+# Maybe create a new class called RowCol?
+
 import pygame
 import logging
 from typing import Optional
@@ -83,6 +88,8 @@ class Renderer:
         self.left_clues_rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
         self.parent_rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
 
+        self.__cell_rect_memo: dict[tuple[int, int], pygame.Rect] = {}
+
         self.board_surface: pygame.Surface = None
         """The base board surface that contains the base grid."""
 
@@ -125,6 +132,8 @@ class Renderer:
         ncols = self.puzzle.ncols
         top_nrows = self.puzzle.top_clues_nrows
         left_ncols = self.puzzle.left_clues_ncols
+
+        self.__cell_rect_memo = {}
 
         # Calculate the optimum cell size where the puzzle fills the screen.
         optimum_cell_size = utils.calc_optimum_cell_size(nrows, ncols,
@@ -209,6 +218,20 @@ class Renderer:
         board_rect = self.board_surface.get_rect().move(board_x, board_y)
         return board_rect
 
+    def get_board_cell_rect(self, row_idx: int, col_idx: int) -> pygame.Rect:
+        """
+        Get the rect surrounding the specified cell. The rect is relative to the board.
+        """
+        if (row_idx, col_idx) in self.__cell_rect_memo:
+            return self.__cell_rect_memo[(row_idx, col_idx)]
+
+        offset = (self.outer_bdr, self.outer_bdr, 0, 0)
+        cell_rect = utils.get_cell_rect(row_idx, col_idx, self.cell_size,
+            self.cell_size, self.cell_bdr, self.sep_bdr, offset)
+        
+        self.__cell_rect_memo[(row_idx, col_idx)] = cell_rect
+        return cell_rect
+
     def is_coord_in_board(self, coord_x: float, coord_y: float) -> bool:
         """
         Returns true if the specified coordinate is inside the board rect.
@@ -223,14 +246,37 @@ class Renderer:
         Convert a point in the screen coordinates to its board coordinates,
         i.e. the board row index and column index.
         """
+        cellsz = self.cell_size
+        cellbdr = self.cell_bdr
+
+        # Get the board rect. Remove the outer borders.
         board_rect = self.get_actual_board_rect()
         board_rect.inflate_ip(self.outer_bdr * -2, self.outer_bdr * -2)
 
-        row_idx = (screen_y - board_rect.y) // (self.cell_size + self.cell_bdr)
-        col_idx = (screen_x - board_rect.x) // (self.cell_size + self.cell_bdr)
+        # Calculate the specified coordinates relative to the board rect.
+        board_x = screen_x - board_rect.x
+        board_y = screen_y - board_rect.y
+
+        # Calculate the width of one separator-group, including the sep_bdr itself.
+        sep_grp_width = ((cellsz + cellbdr) * 5) + (self.sep_bdr - cellbdr)
+        # Calculate which separator-group the coordinates are in.
+        sep_grp_idx_x = board_x // sep_grp_width
+        sep_grp_idx_y = board_y // sep_grp_width
+
+        # Calculate which cell in the separator-group the coordinates are in.
+        mod_x = (abs(board_x) - (sep_grp_idx_x * sep_grp_width)) * (-1 if board_x < 0 else 1)
+        mod_y = abs(board_y) - (sep_grp_idx_y * sep_grp_width) * (-1 if board_y < 0 else 1)
+        cell_idx_x = mod_x // (cellsz + cellbdr)
+        cell_idx_y = mod_y // (cellsz + cellbdr)
+        cell_idx_x = min(4, cell_idx_x)
+        cell_idx_y = min(4, cell_idx_y)
+
+        row_idx = (sep_grp_idx_y * 5) + cell_idx_y
+        col_idx = (sep_grp_idx_x * 5) + cell_idx_x
+
         return int(row_idx), int(col_idx)
 
-    def get_draft_cell_coords(self) -> list[tuple[int, int]]:
+    def get_draft_cell_indices(self) -> list[tuple[int, int]]:
         """
         Get the row/col indices of the draft cells.
         """
@@ -263,7 +309,28 @@ class Renderer:
             logger.error(f'The draft start cell ({tuple(self.draft_start_cell)}) and '
                          f'the draft end cell ({tuple(self.draft_end_cell)}) are not aligned.')
 
-        return cells     
+        return cells
+
+    def get_draft_start_ortho_cells(self) -> list[tuple[int, int]]:
+        """
+        Get the row/col indices of the cells that are orthogonal to the draft start cell,
+        including the draft start cell itself.
+        """
+        cells = []
+        if not self.is_drafting:
+            return cells
+        
+        if self.draft_start_cell is None or self.draft_end_cell is None:
+            logger.error('Draft start cell is None during draft mode.')
+            return cells
+
+        for row_idx in range(self.puzzle.nrows):
+            cells.append((row_idx, self.draft_start_cell.y))
+
+        for col_idx in range(self.puzzle.ncols):
+            cells.append((self.draft_start_cell.x, col_idx))
+
+        return cells
 
     ################################################################################################
     # USER INTERACTION METHODS
@@ -362,37 +429,46 @@ class Renderer:
         self.screen.blits(render_list)
         pygame.display.update()
 
-    def update_symbols(self) -> None:
+    def update_symbols(self, mode: str = 'all') -> None:
         """
-        Update the symbols.
+        Updates the symbols. Draws the symbols and the draft symbols onto the symbols surface.
 
-        Draws the symbols and the draft symbols onto the symbols surface.
+        The `mode` parameter can be set to:
+        - `all`: All cells will be updated.
+        - `draft`: Only the draft cells will be updated.
         """
-        self.symbol_surface.fill(colors.PUZZLE_BG)
-        self.__render_symbols()
-        self.__render_draft()
+        mode = mode.lower()
+        if mode not in ('all', 'draft'):
+            msg = f'Update symbols mode "{mode}" is not supported. Mode will be set to "all".'
+            logger.warning(msg)
+            console.warning(msg)
+            mode = 'all'
 
-    def __render_symbols(self) -> None:
-        """
-        Render the symbols onto the symbols surface.
-        """
-        for row_idx, board_row in enumerate(self.puzzle.board):
-            for col_idx, symbol in enumerate(board_row):
-                self.__draw_symbol(self.symbol_surface, row_idx, col_idx, self.cell_size,
-                    self.outer_bdr, self.cell_bdr, self.sep_bdr, symbol, colors.MAIN_SYMBOL)
+        # If the mode is ALL, update the current symbols of all the cells.
+        if mode == 'all':
+            self.symbol_surface.fill(colors.PUZZLE_BG)
+            for row_idx, board_row in enumerate(self.puzzle.board):
+                for col_idx, symbol in enumerate(board_row):
+                    self.__draw_symbol(self.symbol_surface, row_idx, col_idx,
+                        self.cell_size, symbol, colors.MAIN_SYMBOL, erase_cell=False)
 
-    def __render_draft(self) -> None:
-        """
-        Render the draft symbols onto the symbols surface.
-        Only renders the draft if `is_drafting` is true.
-        """
-        for row_idx, col_idx in self.get_draft_cell_coords():
-            if self.draft_symbol == ' ':
-                new_symbol = self.puzzle.board[row_idx][col_idx]
-            else:
-                new_symbol = self.draft_symbol
-            self.__draw_symbol(self.symbol_surface, row_idx, col_idx, self.cell_size,
-                self.outer_bdr, self.cell_bdr, self.sep_bdr, new_symbol, colors.DRAFT_SYMBOL)
+        # If the mode is DRAFT, redraw the current symbols of only the cells
+        # that are orthogonal to the start draft cell.
+        elif mode == 'draft':
+            for row_idx, col_idx in self.get_draft_start_ortho_cells():
+                symbol = self.puzzle.board[row_idx][col_idx]
+                self.__draw_symbol(self.symbol_surface, row_idx, col_idx,
+                    self.cell_size, symbol, colors.MAIN_SYMBOL)
+        
+        # Then, regardless of the mode, render the draft symbols (but only if currently drafting).
+        if self.is_drafting:
+            for row_idx, col_idx in self.get_draft_cell_indices():
+                if self.draft_symbol == ' ':
+                    new_symbol = self.puzzle.board[row_idx][col_idx]
+                else:
+                    new_symbol = self.draft_symbol
+                self.__draw_symbol(self.symbol_surface, row_idx, col_idx,
+                    self.cell_size, new_symbol, colors.DRAFT_SYMBOL)
 
     ################################################################################################
     # DRAW HELPER METHODS
@@ -542,13 +618,12 @@ class Renderer:
         surface.blits(render_list)
 
     def __draw_symbol(self, surface: pygame.Surface, row_idx: int, col_idx: int,
-        cell_size: int, outer_bdr: int, cell_bdr: int, sep_bdr: int, symbol: str,
-        color: tuple) -> Optional[pygame.Rect]:
+        cell_size: int, symbol: str, color: tuple, erase_cell: bool = True) -> None:
         """
         Render a symbol on the symbols surface.
         """
-        if symbol == ' ':
-            return None
+        if not erase_cell and symbol == ' ':
+            return
 
         # Calculate the padding between the symbol and the cell borders.
         if cell_size <= 6:
@@ -562,18 +637,16 @@ class Renderer:
         else:
             padding = int(cell_size * 0.06)
 
-        offset_x = padding + outer_bdr
-        offset_y = padding + outer_bdr
-        offset_w = padding * -2
-        offset_h = padding * -2
+        # Get the rect that encloses the cell and the rect that encloses the symbol.
+        cell_rect = self.get_board_cell_rect(row_idx, col_idx)
+        symbol_rect = pygame.Rect(cell_rect.x + padding,
+                                  cell_rect.y + padding,
+                                  cell_rect.width + padding * -2,
+                                  cell_rect.height + padding * -2)
 
-        # Get the rect that encloses the symbol.
-        cell_rect_offset = (offset_x, offset_y, offset_w, offset_h)
-        symbol_rect = utils.get_cell_rect(row_idx, col_idx, cell_size, cell_size,
-            cell_bdr, sep_bdr, cell_rect_offset)
-
-        # Erase the current symbol.
-        pygame.draw.rect(surface, colors.PUZZLE_BG, symbol_rect)
+        # Erase the current symbol if the flag is set.
+        if erase_cell:
+            pygame.draw.rect(surface, colors.PUZZLE_BG, cell_rect)
 
         if symbol == ' ':
             # Do nothing for BLANK cells.
@@ -614,9 +687,6 @@ class Renderer:
 
         else:
             logger.error(f'Cannot render unknown symbol: {symbol}')
-            return None
-            
-        return symbol_rect
 
     @lru_cache
     def __get_font(self, cell_size: int) -> pygame.font.Font:

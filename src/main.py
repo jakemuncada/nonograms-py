@@ -104,7 +104,7 @@ def handle_mouse_up(event: pygame.event.Event, renderer: Renderer) -> None:
 
     if not is_lmb:
         if renderer.is_drafting:
-            for row_idx, col_idx in renderer.get_draft_cell_coords():
+            for row_idx, col_idx in renderer.get_draft_cell_indices():
                 renderer.puzzle.board[row_idx][col_idx] = renderer.draft_symbol
         renderer.end_draft()
 
@@ -126,7 +126,7 @@ def handle_mouse_move(event: pygame.event.Event, renderer: Renderer) -> None:
         if (row_idx >= 0 and row_idx < renderer.puzzle.nrows and 
             col_idx >= 0 and col_idx < renderer.puzzle.ncols):
            renderer.update_draft(row_idx, col_idx)
-           renderer.update_symbols()
+           renderer.update_symbols(mode='draft')
            renderer.render()
 
     if is_mmb and renderer.is_dragging:
