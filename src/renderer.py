@@ -40,7 +40,7 @@ class Renderer:
         self.__screen.fill(colors.MAIN_BG)
 
         self.__fonts: list[pygame.font.Font] = []
-        """The list of fonts."""
+        """The list of available fonts."""
         self.__fonts.append(pygame.font.SysFont('consolas', 40))
         self.__fonts.append(pygame.font.SysFont('consolas', 36))
         self.__fonts.append(pygame.font.SysFont('consolas', 32))
@@ -84,6 +84,17 @@ class Renderer:
         """The symbol currently being drafted."""
         self.is_drafting = False
         """True if the puzzle is currently being drafted."""
+
+        self.toggle_clue_start_cell: CellIdx = None
+        """The cell index where the clue toggling started."""
+        self.toggle_clue_end_cell: CellIdx = None
+        """The cell index where the clue toggling ends."""
+        self.clue_cross_flag = True
+        """When true, the clues will be crossed out. When false, the clues will be uncrossed."""
+        self.is_toggling_top_clues = False
+        """True if the top clues are currently being toggled."""
+        self.is_toggling_left_clues = False
+        """True if the left clues are currently being toggled."""
 
         self.cell_bdr = 1
         """The cell border thickness."""
@@ -203,10 +214,7 @@ class Renderer:
             cellsz, self.cell_bdr, self.sep_bdr, True, False, None, self.outer_bdr)
 
         # Draw the clue numbers.
-        self.__draw_clues_numbers(self.top_clues_surface, self.puzzle.top_clues_grid,
-            cellsz, cellsz, self.outer_bdr, self.cell_bdr, self.sep_bdr, colors.BLACK)
-        self.__draw_clues_numbers(self.left_clues_surface, self.puzzle.left_clues_grid,
-            cellsz, cellsz, self.outer_bdr, self.cell_bdr, self.sep_bdr, colors.BLACK)
+        self.update_clues()
 
         # Draw the symbols.
         self.update_symbols()
@@ -461,6 +469,40 @@ class Renderer:
                 self.__draw_symbol(self.symbol_surface, cell_rect, self.cell_size,
                     new_symbol, colors.DRAFT_SYMBOL)
 
+    def update_clues(self, mode: str = 'all') -> None:
+        """
+        Updates the symbols. Draws the symbols and the draft symbols onto the symbols surface.
+
+        The `mode` parameter can be set to:
+        - `all`: All clue cells will be updated.
+        - `top`: Only the top clues will be updated.
+        - `left`: Only the left clues will be updated.
+        """
+        mode = mode.lower()
+        if mode not in ('all', 'top', 'left'):
+            msg = f'Update clues mode "{mode}" is not supported. Mode will be set to "all".'
+            logger.warning(msg)
+            console.warning(msg)
+            mode = 'all'
+
+        sz = self.cell_size
+        top_clues_flag = mode in ('all', 'top')
+        left_clues_flag = mode in ('all', 'left')
+
+        if top_clues_flag:
+            surface = self.top_clues_surface
+            grid = self.puzzle.top_clues_grid
+            ticks = self.puzzle.top_clues_ticks
+            self.__draw_clues_numbers(surface, grid, ticks, sz, sz, 
+                self.outer_bdr, self.cell_bdr, self.sep_bdr, colors.BLACK)
+        
+        if left_clues_flag:
+            surface = self.left_clues_surface
+            grid = self.puzzle.left_clues_grid
+            ticks = self.puzzle.left_clues_ticks
+            self.__draw_clues_numbers(surface, grid, ticks, sz, sz, 
+                self.outer_bdr, self.cell_bdr, self.sep_bdr, colors.BLACK)
+
     ################################################################################################
     # DRAW HELPER METHODS
     ################################################################################################
@@ -582,12 +624,13 @@ class Renderer:
                         pygame.draw.line(surface, color, p1, p2, 1)
 
     def __draw_clues_numbers(self, surface: pygame.Surface, grid: list[list[int]],
-        cell_width: float, cell_height: float, outer_bdr: int, cell_bdr: int,
-        sep_bdr: int, color: tuple) -> None:
+        ticks: list[list[int]], cell_width: float, cell_height: float, outer_bdr: int,
+        cell_bdr: int, sep_bdr: int, color: tuple) -> None:
         """
         Draw the clue numbers.
         """
-        render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
+        font_render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
+        tick_render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
         font = self.__get_font(min(cell_width, cell_height))
 
         cell_rect_offset = (outer_bdr, outer_bdr, 0, 0)
@@ -604,9 +647,9 @@ class Renderer:
                 x = cell_rect.centerx - text_rect.centerx
                 y = cell_rect.centery - text_rect.centery + (text_rect.height / 12)
                 draw_rect = pygame.Rect(x, y, text_rect.width, text_rect.height)
-                render_list.append((text_surface, draw_rect))
+                font_render_list.append((text_surface, draw_rect))
 
-        surface.blits(render_list)
+        surface.blits(font_render_list)
 
     def __draw_symbol(self, surface: pygame.Surface, cell_rect: pygame.Rect,
         cell_size: int, symbol: str, color: tuple, erase_cell: bool = True) -> None:
