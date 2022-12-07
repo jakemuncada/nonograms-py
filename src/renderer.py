@@ -84,8 +84,8 @@ class Renderer:
         """The cell index where the clue toggling started."""
         self.toggle_clue_end_cell: CellIdx = None
         """The cell index where the clue toggling ends."""
-        self.clue_cross_flag = True
-        """When true, the clues will be crossed out. When false, the clues will be uncrossed."""
+        self.clue_tick_flag = True
+        """When true, the clues will be ticked. When false, the clues will be unticked."""
         self.is_toggling_top_clues = False
         """True if the top clues are currently being toggled."""
         self.is_toggling_left_clues = False
@@ -114,9 +114,13 @@ class Renderer:
 
         self.left_clues_surface: pygame.Surface = None
         """The left clues panel."""
+        self.left_clues_tick_surface: pygame.Surface = None
+        """The surface containing the clue tick marks of the left clues panel."""
 
         self.top_clues_surface: pygame.Surface = None
         """The left clues panel."""
+        self.top_clues_tick_surface: pygame.Surface = None
+        """The surface containing the clue tick marks of the top clues panel."""
 
     @property
     def screen(self) -> pygame.Surface:
@@ -138,6 +142,12 @@ class Renderer:
         """
         logger.info(f'Initializing {puzzle.nrows}x{puzzle.ncols} puzzle...')
         self.puzzle = puzzle
+
+        if min(puzzle.nrows, puzzle.ncols) <= 10:
+            self.cell_bdr = 2
+            self.outer_bdr = self.cell_bdr * 2
+            self.sep_bdr = self.cell_bdr * 2
+
         self.initialize_surfaces()
 
     def initialize_surfaces(self) -> None:
@@ -188,12 +198,22 @@ class Renderer:
         self.symbol_surface.fill(colors.PUZZLE_BG)
 
         # Create the top clues panel surface.
-        self.top_clues_surface = pygame.Surface((top_clues_rect.width, top_clues_rect.height))
+        top_clues_size = (top_clues_rect.width, top_clues_rect.height)
+        self.top_clues_surface = pygame.Surface(top_clues_size)
         self.top_clues_surface.fill(colors.CLUES_BG)
+        self.top_clues_tick_surface = pygame.Surface(top_clues_size)
+        self.top_clues_tick_surface.fill(colors.CLUES_TRANSPARENCY)
+        pygame.Surface.set_colorkey(self.top_clues_tick_surface, colors.CLUES_TRANSPARENCY)
+        self.top_clues_tick_surface.set_alpha(130)
 
         # Create the left clues panel surface.
-        self.left_clues_surface = pygame.Surface((left_clues_rect.width, left_clues_rect.height))
+        left_clues_size = (left_clues_rect.width, left_clues_rect.height)
+        self.left_clues_surface = pygame.Surface(left_clues_size)
         self.left_clues_surface.fill(colors.CLUES_BG)
+        self.left_clues_tick_surface = pygame.Surface(left_clues_size)
+        self.left_clues_tick_surface.fill(colors.CLUES_TRANSPARENCY)
+        pygame.Surface.set_colorkey(self.left_clues_tick_surface, colors.CLUES_TRANSPARENCY)
+        self.left_clues_tick_surface.set_alpha(130)
 
         # Draw the outer borders.
         self.__draw_rect_borders(self.board_surface, self.outer_bdr)
@@ -226,10 +246,36 @@ class Renderer:
         Note that `self.board_rect` is the rect relative to `self.parent_rect`,
         so its actual position needs to be adjusted.
         """
-        board_x = self.parent_rect.x + self.board_rect.x + self.__pan_delta.x
-        board_y = self.parent_rect.y + self.board_rect.y + self.__pan_delta.y
-        board_rect = self.board_surface.get_rect().move(board_x, board_y)
+        actual_x = self.parent_rect.x + self.board_rect.x + self.__pan_delta.x
+        actual_y = self.parent_rect.y + self.board_rect.y + self.__pan_delta.y
+        board_rect = self.board_surface.get_rect().move(actual_x, actual_y)
         return board_rect
+
+    def get_actual_top_clues_rect(self) -> pygame.Rect:
+        """
+        Get the actual top clues rect relative to the screen,
+        after adjusting for the parent rect and the pan delta.
+        
+        Note that `self.top_clues_rect` is the rect relative to `self.parent_rect`,
+        so its actual position needs to be adjusted.
+        """
+        actual_x = self.parent_rect.x + self.board_rect.x + self.__pan_delta.x
+        actual_y = self.parent_rect.y + self.top_clues_rect.y + self.__pan_delta.y
+        top_clues_rect = self.top_clues_surface.get_rect().move(actual_x, actual_y)
+        return top_clues_rect
+        
+    def get_actual_left_clues_rect(self) -> pygame.Rect:
+        """
+        Get the actual left clues rect relative to the screen,
+        after adjusting for the parent rect and the pan delta.
+        
+        Note that `self.left_clues_surface` is the rect relative to `self.parent_rect`,
+        so its actual position needs to be adjusted.
+        """
+        actual_x = self.parent_rect.x + self.left_clues_rect.x + self.__pan_delta.x
+        actual_y = self.parent_rect.y + self.board_rect.y + self.__pan_delta.y
+        left_clues_rect = self.left_clues_surface.get_rect().move(actual_x, actual_y)
+        return left_clues_rect
 
     def get_board_cell_rect(self, row_idx: int, col_idx: int) -> pygame.Rect:
         """
@@ -256,8 +302,7 @@ class Renderer:
 
     def screen_coord_to_cell_idx(self, screen_x: float, screen_y: float) -> CellIdx:
         """
-        Convert a point in the screen coordinates to its board coordinates,
-        i.e. the board row index and column index.
+        Convert a point in the screen coordinates to its board cell index.
         """
         # Get the board rect. Remove the outer borders.
         board_rect = self.get_actual_board_rect()
@@ -265,6 +310,17 @@ class Renderer:
         
         return CellIdx(utils.screen_coord_to_cell_idx(screen_x, screen_y,
             board_rect, self.cell_size, self.cell_bdr, self.sep_bdr))
+
+    def screen_coord_to_top_clues_idx(self, screen_x: float, screen_y: float) -> CellIdx:
+        """
+        Convert a point in the screen coordinates to its top clues cell index.
+        """
+        # Get the top clues rect. Remove the outer borders.
+        rect = self.get_actual_top_clues_rect()
+        rect.inflate_ip(self.outer_bdr * -2, self.outer_bdr * -2)
+        
+        return CellIdx(utils.screen_coord_to_cell_idx(screen_x, screen_y,
+            rect, self.cell_size, self.cell_bdr, self.sep_bdr))
 
     def get_draft_cell_indices(self) -> list[CellIdx]:
         """
@@ -319,6 +375,42 @@ class Renderer:
 
         for col_idx in range(self.puzzle.ncols):
             cells.append((self.draft_start_cell.row, col_idx))
+
+        return cells
+
+    def get_clues_toggle_cell_indices(self) -> list[CellIdx]:
+        """
+        Get the row/col indices of the clue panel's cells that are currently being toggled.
+
+        The cell indices will depend on the current clue toggling mode,
+        whether the left clues are being toggle or the top clues are being toggled.
+        """
+        cells: list[CellIdx] = []
+        if not self.is_toggling_top_clues and not self.is_toggling_left_clues:
+            return cells
+        
+        if self.toggle_clue_start_cell is None or self.toggle_clue_end_cell is None:
+            logger.error('Clue toggle start/end cell is None during clue toggling mode.')
+            return cells
+        
+        if self.toggle_clue_start_cell.col == self.toggle_clue_end_cell.col:
+            col = self.toggle_clue_start_cell.col
+            min_row = min(self.toggle_clue_start_cell.row, self.toggle_clue_end_cell.row)
+            max_row = max(self.toggle_clue_start_cell.row, self.toggle_clue_end_cell.row)
+            for row in range(min_row, max_row + 1):
+                cells.append(CellIdx(row, col))
+        
+        elif self.toggle_clue_start_cell.row == self.toggle_clue_end_cell.row:
+            row = self.toggle_clue_start_cell.row
+            min_col = min(self.toggle_clue_start_cell.col, self.toggle_clue_end_cell.col)
+            max_col = max(self.toggle_clue_start_cell.col, self.toggle_clue_end_cell.col)
+            for col in range(min_col, max_col + 1):
+                cells.append(CellIdx(row, col))
+
+        else:
+            logger.error(f'The clue toggling start cell ({tuple(self.toggle_clue_start_cell)}) and '
+                         f'the clue toggling end cell ({tuple(self.toggle_clue_end_cell)}) '
+                          'are not aligned.')
 
         return cells
 
@@ -393,6 +485,48 @@ class Renderer:
         self.draft_symbol = ' '
         self.is_drafting = False
 
+    def start_left_clue_toggling(self, row_idx: int, col_idx: int, tick_flag: bool) -> None:
+        """
+        Start toggling the left clues at the specified cell index.
+        """
+        self.is_toggling_left_clues = True
+        self.is_toggling_top_clues = False
+        self.toggle_clue_start_cell = row_idx
+        self.toggle_clue_end_cell = col_idx
+        self.clue_tick_flag = tick_flag
+
+    def start_top_clue_toggling(self, row_idx: int, col_idx: int, tick_flag: bool) -> None:
+        """
+        Start toggling the top clues at the specified cell index.
+        """
+        print(row_idx, col_idx)
+        self.is_toggling_top_clues = True
+        self.is_toggling_left_clues = False
+        self.toggle_clue_start_cell = CellIdx(row_idx, col_idx)
+        self.toggle_clue_end_cell = CellIdx(row_idx, col_idx)
+        self.clue_tick_flag = tick_flag
+
+    def update_clue_toggling(self, row_idx: int, col_idx: int) -> None:
+        """
+        Continue clue toggling, updating the current toggle cells.
+        """
+        vertical_len = abs(self.toggle_clue_start_cell.row - row_idx)
+        horizontal_len = abs(self.toggle_clue_end_cell.col - col_idx)
+        if horizontal_len >= vertical_len:
+            self.toggle_clue_end_cell = CellIdx(self.toggle_clue_start_cell.row, col_idx)
+        else:
+            self.toggle_clue_end_cell = CellIdx(row_idx, self.toggle_clue_start_cell.col)
+
+    def end_clue_toggling(self) -> None:
+        """
+        Stop toggling the clues.
+        """
+        self.is_toggling_top_clues = False
+        self.is_toggling_left_clues = False
+        self.toggle_clue_start_cell = None
+        self.toggle_clue_end_cell = None
+        self.clue_tick_flag = True
+
     ################################################################################################
     # RENDER METHOD
     ################################################################################################
@@ -407,13 +541,13 @@ class Renderer:
         render_list.append((self.board_surface, board_rect))
         render_list.append((self.symbol_surface, board_rect))
 
-        top_clues_y = self.parent_rect.y + self.top_clues_rect.y + self.__pan_delta.y
-        top_clues_rect = self.top_clues_surface.get_rect().move(board_rect.x, top_clues_y)
+        top_clues_rect = self.get_actual_top_clues_rect()
         render_list.append((self.top_clues_surface, top_clues_rect))
+        render_list.append((self.top_clues_tick_surface, top_clues_rect))
 
-        left_clues_x = self.parent_rect.x + self.left_clues_rect.x + self.__pan_delta.x
-        left_clues_rect = self.left_clues_surface.get_rect().move(left_clues_x, board_rect.y)
+        left_clues_rect = self.get_actual_left_clues_rect()
         render_list.append((self.left_clues_surface, left_clues_rect))
+        render_list.append((self.left_clues_tick_surface, left_clues_rect))
 
         self.screen.fill(colors.MAIN_BG)
         self.screen.blits(render_list)
@@ -484,19 +618,28 @@ class Renderer:
         top_clues_flag = mode in ('all', 'top')
         left_clues_flag = mode in ('all', 'left')
 
+        toggle_cells = self.get_clues_toggle_cell_indices()
+        tick_flag = self.clue_tick_flag
+
         if top_clues_flag:
             surface = self.top_clues_surface
+            tick_surface = self.top_clues_tick_surface
             grid = self.puzzle.top_clues_grid
             ticks = self.puzzle.top_clues_ticks
-            self.__draw_clues_numbers(surface, grid, ticks, sz, sz, 
-                self.outer_bdr, self.cell_bdr, self.sep_bdr, colors.BLACK)
+            toggle_cells = None if not self.is_toggling_top_clues else toggle_cells
+            tick_surface.fill(colors.CLUES_TRANSPARENCY)
+            self.__draw_clues_cells(surface, tick_surface, grid, ticks, toggle_cells, tick_flag,
+                sz, sz, self.outer_bdr, self.cell_bdr, self.sep_bdr, colors.BLACK)
         
         if left_clues_flag:
             surface = self.left_clues_surface
+            tick_surface = self.left_clues_tick_surface
             grid = self.puzzle.left_clues_grid
             ticks = self.puzzle.left_clues_ticks
-            self.__draw_clues_numbers(surface, grid, ticks, sz, sz, 
-                self.outer_bdr, self.cell_bdr, self.sep_bdr, colors.BLACK)
+            toggle_cells = None if not self.is_toggling_left_clues else toggle_cells
+            tick_surface.fill(colors.CLUES_TRANSPARENCY)
+            self.__draw_clues_cells(surface, tick_surface, grid, ticks, toggle_cells, tick_flag,
+                sz, sz, self.outer_bdr, self.cell_bdr, self.sep_bdr, colors.BLACK)
 
     ################################################################################################
     # DRAW HELPER METHODS
@@ -618,33 +761,86 @@ class Renderer:
                         p2 = (x + sep_idx + 1, rect.y + rect.height + 0.5)
                         pygame.draw.line(surface, color, p1, p2, 1)
 
-    def __draw_clues_numbers(self, surface: pygame.Surface, grid: list[list[int]],
-        ticks: list[list[int]], cell_width: float, cell_height: float, outer_bdr: int,
-        cell_bdr: int, sep_bdr: int, color: tuple) -> None:
+    def __draw_clues_cells(self, clue_surface: pygame.Surface, tick_surface: pygame.Surface,
+        grid: list[list[int]], ticks: list[list[int]], toggle_cells: list[CellIdx],
+        toggle_tick: bool, cell_width: float, cell_height: float, outer_bdr: int, cell_bdr: int,
+        sep_bdr: int, color: tuple) -> None:
         """
         Draw the clue numbers.
         """
         font_render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
-        tick_render_list: list[tuple[pygame.Surface, pygame.Rect]] = []
         font = self.__get_font(min(cell_width, cell_height))
 
         cell_rect_offset = (outer_bdr, outer_bdr, 0, 0)
+        toggle_cells = set(toggle_cells) if toggle_cells else set()
 
         for row_idx in range(len(grid)):
             for col_idx in range(len(grid[row_idx])):
-                num = grid[row_idx][col_idx]
-                if num <= 0:
-                    continue
-                cell_rect = utils.get_cell_rect(row_idx, col_idx, cell_width, cell_height,
-                    cell_bdr, sep_bdr, cell_rect_offset)
-                text_surface = font.render(str(num), True, color)
-                text_rect = text_surface.get_rect()
-                x = cell_rect.centerx - text_rect.centerx
-                y = cell_rect.centery - text_rect.centery + (text_rect.height / 12)
-                draw_rect = pygame.Rect(x, y, text_rect.width, text_rect.height)
-                font_render_list.append((text_surface, draw_rect))
 
-        surface.blits(font_render_list)
+                num = grid[row_idx][col_idx]
+                
+                if (row_idx, col_idx) in toggle_cells:
+                    has_tick = toggle_tick
+                else:
+                    has_tick = ticks[row_idx][col_idx]
+
+                if num > 0:
+                    cell_rect = utils.get_cell_rect(row_idx, col_idx,
+                        cell_width, cell_height, cell_bdr, sep_bdr, cell_rect_offset)
+                    render_item = self.__get_clue_text_render_item(num, cell_rect, font, color)
+                    font_render_list.append(render_item)
+
+                    if has_tick:
+                        self.__draw_clue_tick(tick_surface, cell_rect,
+                            cell_width, cell_height, color)
+
+        clue_surface.blits(font_render_list)
+
+    def __get_clue_text_render_item(self, num: int, cell_rect: pygame.Rect,
+        font: pygame.font.Font, color: tuple) -> Optional[tuple[pygame.Surface, pygame.Rect]]:
+        """
+        Get the render item of the text in the specified clue cell.
+        If the clue number is zero or negative, None is returned.
+
+        A render item is a tuple consisting of the surface and its rect.
+        """
+        if num <= 0:
+            return None
+
+        text_surface = font.render(str(num), True, color)
+        text_rect = text_surface.get_rect()
+        x = cell_rect.centerx - text_rect.centerx
+        y = cell_rect.centery - text_rect.centery + (text_rect.height / 12)
+        draw_rect = pygame.Rect(x, y, text_rect.width, text_rect.height)
+        return text_surface, draw_rect
+
+    def __draw_clue_tick(self, surface: pygame.Surface, cell_rect: pygame.Rect,
+        cell_width: int, cell_height: int, color: tuple) -> None:
+        """
+        Draw the clue tick on the specified cell.
+        """
+        tl = cell_rect.topleft
+        tr = (tl[0] + cell_width, tl[1] - 1)
+        bl = (tl[0] - 1, tl[1] + cell_height)
+        br = (tr[0], bl[1])
+
+        p1, p2 = tl, br
+        p1a = (p1[0] + 1,   p1[1])
+        p2a = (p2[0],       p2[1] - 1)
+        p1b = (p1[0],       p1[1] + 1)
+        p2b = (p2[0] - 1,   p2[1])
+        pygame.draw.aaline(surface, color, p1, p2, 1)
+        pygame.draw.aaline(surface, color, p1a, p2a, 1)
+        pygame.draw.aaline(surface, color, p1b, p2b, 1)
+
+        p1, p2 = bl, tr
+        p1a = (p1[0] + 1,   p1[1])
+        p2a = (p2[0],       p2[1] + 1)
+        p1b = (p1[0],       p1[1] - 1)
+        p2b = (p2[0] - 1,   p2[1])
+        pygame.draw.aaline(surface, color, p1, p2, 1)
+        pygame.draw.aaline(surface, color, p1a, p2a, 1)
+        pygame.draw.aaline(surface, color, p1b, p2b, 1)
 
     def __draw_symbol(self, surface: pygame.Surface, cell_rect: pygame.Rect,
         cell_size: int, symbol: str, color: tuple, erase_cell: bool = True) -> None:

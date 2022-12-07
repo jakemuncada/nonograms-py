@@ -38,6 +38,12 @@ def main(args: list[str]):
             data = json.load(f)
         puzzle = Puzzle.from_json(data[puzzle_idx])
 
+        puzzle.left_clues_ticks[3][-1] = True
+        puzzle.left_clues_ticks[3][-2] = True
+        puzzle.left_clues_ticks[4][-2] = True
+        puzzle.left_clues_ticks[5][-1] = True
+        puzzle.left_clues_ticks[6][-3] = True
+
         renderer = Renderer(SCREEN)
         renderer.initialize_puzzle(puzzle)
         renderer.render()
@@ -80,17 +86,26 @@ def handle_mouse_down(event: pygame.event.Event, renderer: Renderer) -> None:
         renderer.end_draft()
 
     elif is_lmb:
-        row_idx, col_idx = renderer.screen_coord_to_cell_idx(curr_x, curr_y)
-        if (row_idx >= 0 and row_idx < renderer.puzzle.nrows and 
-            col_idx >= 0 and col_idx < renderer.puzzle.ncols):
-            curr_symbol = renderer.puzzle.board[row_idx][col_idx]
-            if curr_symbol == ' ':
-                new_symbol = '.'
-            elif curr_symbol == '.':
-                new_symbol = 'x'
-            elif curr_symbol == 'x':
-                new_symbol = ' '
-            renderer.start_draft(row_idx, col_idx, new_symbol)
+        if renderer.get_actual_board_rect().collidepoint(curr_x, curr_y):
+            row_idx, col_idx = renderer.screen_coord_to_cell_idx(curr_x, curr_y)
+            if renderer.puzzle.is_board_cell_idx_valid(row_idx, col_idx):
+                curr_symbol = renderer.puzzle.board[row_idx][col_idx]
+                if curr_symbol == ' ':
+                    new_symbol = '.'
+                elif curr_symbol == '.':
+                    new_symbol = 'x'
+                elif curr_symbol == 'x':
+                    new_symbol = ' '
+                renderer.start_draft(row_idx, col_idx, new_symbol)
+
+        elif renderer.get_actual_top_clues_rect().collidepoint(curr_x, curr_y):
+            row_idx, col_idx = renderer.screen_coord_to_top_clues_idx(curr_x, curr_y)
+            if renderer.puzzle.is_top_clues_cell_idx_valid(row_idx, col_idx):
+                tick_flag = not renderer.puzzle.top_clues_ticks[row_idx][col_idx]
+                renderer.start_top_clue_toggling(row_idx, col_idx, tick_flag)
+
+        elif renderer.get_actual_left_clues_rect().collidepoint(curr_x, curr_y):
+            pass
 
     elif is_mmb:
         renderer.start_drag(curr_x, curr_y)
@@ -108,12 +123,18 @@ def handle_mouse_up(event: pygame.event.Event, renderer: Renderer) -> None:
         if renderer.is_drafting:
             for row_idx, col_idx in renderer.get_draft_cell_indices():
                 renderer.puzzle.board[row_idx][col_idx] = renderer.draft_symbol
-        renderer.end_draft()
+            renderer.end_draft()
+
+        if renderer.is_toggling_top_clues:
+            for row_idx, col_idx in renderer.get_clues_toggle_cell_indices():
+                renderer.puzzle.top_clues_ticks[row_idx][col_idx] = renderer.clue_tick_flag
+            renderer.end_clue_toggling()
 
     if not is_mmb:
         renderer.end_drag()
 
     renderer.update_symbols()
+    renderer.update_clues()
     renderer.render()
 
 def handle_mouse_move(event: pygame.event.Event, renderer: Renderer) -> None:
@@ -125,11 +146,17 @@ def handle_mouse_move(event: pygame.event.Event, renderer: Renderer) -> None:
 
     if is_lmb and renderer.is_drafting:
         row_idx, col_idx = renderer.screen_coord_to_cell_idx(curr_x, curr_y)
-        if (row_idx >= 0 and row_idx < renderer.puzzle.nrows and 
-            col_idx >= 0 and col_idx < renderer.puzzle.ncols):
+        if renderer.puzzle.is_board_cell_idx_valid(row_idx, col_idx):
            renderer.update_draft(row_idx, col_idx)
            renderer.update_symbols(mode='draft')
            renderer.render()
+
+    if is_lmb and renderer.is_toggling_top_clues:
+        row_idx, col_idx = renderer.screen_coord_to_top_clues_idx(curr_x, curr_y)
+        if renderer.puzzle.is_top_clues_cell_idx_valid(row_idx, col_idx):
+            renderer.update_clue_toggling(row_idx, col_idx)
+            renderer.update_clues()
+            renderer.render()
 
     if is_mmb and renderer.is_dragging:
         renderer.update_drag(curr_x, curr_y)

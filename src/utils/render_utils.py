@@ -2,7 +2,7 @@
 Some useful utility functions for the renderer.
 """
 
-import pygame
+from pygame import Rect
 from typing import Optional, Union
 import src.constants as constants
 
@@ -17,7 +17,7 @@ def calc_rects(
     board_ncols: int, 
     top_clues_nrows: int,
     left_clues_ncols: int) -> \
-    tuple[pygame.Rect, pygame.Rect, pygame.Rect, pygame.Rect]:
+    tuple[Rect, Rect, Rect, Rect]:
     """
     Calculate the sizes and positions of the board, the top and left clues panels,
     and the parent rect that contains the above rects.
@@ -73,28 +73,28 @@ def calc_rects(
     parent_h = total_cell_size_v + total_border_thick_v - outer_bdr
     parent_x = constants.SCREEN_HALF_WIDTH - (parent_w / 2)
     parent_y = constants.SCREEN_HALF_HEIGHT - (parent_h / 2)
-    parent_rect = pygame.Rect(parent_x, parent_y, parent_w, parent_h)
+    parent_rect = Rect(parent_x, parent_y, parent_w, parent_h)
 
     # Calculate the BOARD rect.
     board_w = board_border_thick_h + board_cell_size_h
     board_h = board_border_thick_v + board_cell_size_v
     board_x = parent_w - board_w
     board_y = parent_h - board_h
-    board_rect = pygame.Rect(board_x, board_y, board_w, board_h)
+    board_rect = Rect(board_x, board_y, board_w, board_h)
 
     # Calculate the TOP CLUES rect.
     top_clues_w = board_w
     top_clues_h = top_clues_border_thick_v + top_clues_cell_size_v
     top_clues_x = board_x
     top_clues_y = 0
-    top_clues_rect = pygame.Rect(top_clues_x, top_clues_y, top_clues_w, top_clues_h)
+    top_clues_rect = Rect(top_clues_x, top_clues_y, top_clues_w, top_clues_h)
 
     # Calculate the LEFT CLUES rect.
     left_clues_w = left_clues_border_thick_h + left_clues_cell_size_h
     left_clues_h = board_h
     left_clues_x = 0
     left_clues_y = board_y
-    left_clues_rect = pygame.Rect(left_clues_x, left_clues_y, left_clues_w, left_clues_h)
+    left_clues_rect = Rect(left_clues_x, left_clues_y, left_clues_w, left_clues_h)
 
     return board_rect, top_clues_rect, left_clues_rect, parent_rect
 
@@ -164,8 +164,8 @@ def get_cell_rect(
     cell_height: float,
     bdr: int,
     sep_bdr: int,
-    offset: Optional[Union[pygame.Rect, tuple[float, float, float, float]]] = None
-    ) -> pygame.Rect:
+    offset: Optional[Union[Rect, tuple[float, float, float, float]]] = None
+    ) -> Rect:
     """
     Get the rect of the specified cell.
 
@@ -195,11 +195,11 @@ def get_cell_rect(
     else:
         offset_x, offset_y, offset_w, offset_h = 0, 0, 0, 0
 
-    return pygame.Rect(x + offset_x, y + offset_y,
+    return Rect(x + offset_x, y + offset_y,
         width + offset_w, height + offset_h)
 
 
-def screen_coord_to_cell_idx(screen_x: float, screen_y: float, board_rect: pygame.Rect,
+def screen_coord_to_cell_idx(screen_x: float, screen_y: float, board_rect: Rect,
     cell_size: int, cell_bdr: int, sep_bdr: int) -> tuple[int, int]:
     """
     Convert a point in the screen coordinates to its board coordinates,

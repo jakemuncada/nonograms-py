@@ -145,6 +145,36 @@ class Puzzle:
         """The number of cols in the left clues grid."""
         return self.__left_clues_ncols
 
+    def is_board_cell_idx_valid(self, row_idx: int, col_idx: int) -> bool:
+        """
+        Returns true if the given board cell index is a valid cell index,
+        i.e. is inside the puzzle board. Returns false otherwise.
+        """
+        if (row_idx < 0 or row_idx >= self.nrows or
+            col_idx < 0 or col_idx >= self.ncols):
+           return False
+        return True
+
+    def is_top_clues_cell_idx_valid(self, row_idx: int, col_idx: int) -> bool:
+        """
+        Returns true if the given top clues cell index is a valid cell index,
+        i.e. is inside the top clues grid. Returns false otherwise.
+        """
+        if (row_idx < 0 or row_idx >= self.top_clues_nrows or
+            col_idx < 0 or col_idx >= self.top_clues_ncols):
+           return False
+        return True
+        
+    def is_left_clues_cell_idx_valid(self, row_idx: int, col_idx: int) -> bool:
+        """
+        Returns true if the given left clues cell index is a valid cell index,
+        i.e. is inside the left clues grid. Returns false otherwise.
+        """
+        if (row_idx < 0 or row_idx >= self.left_clues_nrows or
+            col_idx < 0 or col_idx >= self.left_clues_ncols):
+           return False
+        return True
+
     @staticmethod
     def __is_2d_grid_rectangular(grid: list[list[str]]) -> bool:
         """
